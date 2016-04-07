@@ -1,0 +1,11 @@
+bower_components
+node_modules
+config_local.json
+dist/
+vendors/
+ui/src/assets/css/
+npm-debug.log
+.DS_Store
+*.orig
+/ui/src/*.html
+!/ui/src/*.tpl.html
