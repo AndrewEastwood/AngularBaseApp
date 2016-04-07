@@ -1,15 +1,11 @@
 {
-  "name": "CureForward",
+  "name": "AngularBaseApp",
   "version": "0.0.1",
-  "description": "",
   "scripts": {
     "lint": "gulp app:lintjs",
     "styling": "gulp app:css",
     "validate": "npm ls"
   },
-  "author": "CureForward Team",
-  "license": "Copyright Cure Forward",
-  "private": true,
   "devDependencies": {
     "gulp": "^3.9.0",
     "gulp-angular-templatecache": "^1.7.0",
