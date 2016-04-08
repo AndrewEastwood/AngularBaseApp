@@ -6,21 +6,24 @@
     <meta http-equiv="x-ua-compatible" content="ie=10">
     <meta name="description" content="{{metaContent}}">
     <link rel="shortcut icon"
-        sizes="16x16 24x24 32x32 48x48 64x64" href="<!-- @echo CONFIGJSON.hostname-->favicon.ico">
+        sizes="16x16 24x24 32x32 48x48 64x64" href="http://localhost/favicon.ico">
     <meta name="application-name"
-        content="<!-- @echo CONFIGJSON.appName -->">
+        content="undefined">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=0">
     <link rel="stylesheet"
-        href="<!-- @echo STATICDIR -->assets/css/<!-- @echo APP -->/<!-- @echo APP -->.css<!--@echo BUST -->" />
+        href="/assets/css/one/one.css?bust=1460053216290" />
     <!--[if IE]>
         <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
     <script type="text/javascript">
-    var CONFIG = <!-- @echo CONFIG -->;
+    var CONFIG = {"solution":"Your test solution","cookieHost":"localhost","hostname":"http://localhost/","apiUrl":"","gaKey":"","VERSION":1460053216290,"DEBUG":true,"ENV":"debug","STATICDIR":"/"};
     </script>
 </head>
 <body>
+    <com-header></com-header>
+    <div class="cf-content-outer-padding" ui-view="content"></div>
+    <com-footer></com-footer>
     <!-- bower:js -->
     <!-- endinject -->
     <!-- portal:js -->

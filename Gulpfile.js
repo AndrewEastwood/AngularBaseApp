@@ -22,35 +22,24 @@ var minifyCss = require('gulp-minify-css');
 var nop = require('gulp-nop');
 var ngHtml2Js = require("gulp-ng-html2js");
 var inlineCss = require('gulp-inline-css');
+var bower = require('gulp-bower');
 
-    // application's main config file
+// application's main config file
 var config = require('./config.json'),
     // get local configuration
-    configLocal = {},
+    // configLocal = {},
     env = (argv.env || 'debug').toLowerCase(),
     isBuild = env !== 'debug',
     uglifySources = !/debug|dev/.test(env),
-    dirVendors = 'vendors/',
-    dirLibs = 'libs/',
     buildVersion = (new Date()).getTime(),
     buildVersionUrlParam = '?bust=' + buildVersion,
-    pathToBowerJson = './bower.json',
-    path = {
-        src: 'ui/src/',
-        dist: 'ui/dist/',
-        app: 'ui/src/',
-        urlStatic: isBuild ? '/static/' + buildVersion + '/' : '/',
-        distStatic: 'ui/dist/' + (isBuild ? 'static/' + buildVersion + '/' : '')
-    }
-    pathToVendors = path.app + dirVendors,
-    pathToLibs = path.app + dirLibs,
     apps = Object.getOwnPropertyNames(config.apps);
 
-// load local config file
-if (fs.existsSync('./config_local.json')) {
-    gutil.log('Using local config file: config_local.json');
-    configLocal = require('./config_local.json');
-}
+// // load local config file
+// if (fs.existsSync('./config_local.json')) {
+//     gutil.log('Using local config file: config_local.json');
+//     configLocal = require('./config_local.json');
+// }
 
 // set new app path in case of build mode
 if (isBuild) {
@@ -68,11 +57,38 @@ gutil.log('[path] pathToVendors = ' + pathToVendors);
 gutil.log('[path] pathToLibs= ' + pathToLibs);
 gutil.log('[path] pathToBowerJson = ' + pathToBowerJson);
 
-function hasEnvConfig (appName, env) {
+
+function theApp (name) {
+
+    var dirVendors = 'vendors/',
+        dirLibs = 'libs/',
+        pathToBowerJson = './bower.json',
+        path = {
+            src: 'ui/src/',
+            dist: 'ui/dist/',
+            app: 'ui/src/',
+            urlStatic: isBuild ? '/static/' + buildVersion + '/' : '/',
+            distStatic: 'ui/dist/' + (isBuild ? 'static/' + buildVersion + '/' : '')
+        }
+        pathToVendors = path.app + dirVendors,
+        pathToLibs = path.app + dirLibs;
+
+    this.getConfig = function () {
+        return {
+
+        }
+    }
+}
+
+theApp.prototype.hasEnvConfig = function (appName, env) {
     if (env) {
         return config && config.apps && config.apps[appName] && config.apps[appName][env];
     }
     return config && config.apps && config.apps[appName];
+}
+
+theApp.prototype.build = function () {
+
 }
 
 function doForEachApp(cb, taskOwner, summary) {
@@ -87,6 +103,33 @@ function doForEachApp(cb, taskOwner, summary) {
     });
     return seriesTasks;
 }
+
+function watchLocalChanges() {
+    // TDO: fix js first then uncomment
+    gulp.watch('ui/src/solution/**/*.js', ['app:lintjs']);
+    gulp.watch('ui/src/assets/styles/**', ['app:css']);
+    gulp.watch('ui/src/*.tpl.html', ['app:html']);
+    gulp.watch('config*.json', ['app:html']);
+    gulp.watch('bower.json', ['app:html']);
+    gulp.watch('.jshintrc', ['app:lintjs']);
+}
+
+/******* startup taks *******/
+
+// default task
+if (isBuild) {
+    gulp.task('default', ['package']);
+} else {
+    gulp.task('default', ['app:html'], watchLocalChanges);
+}
+
+
+doForEachApp(function () {
+
+})
+
+
+
 
 // simple wrapper for injected files lthat adds the bust param
 function getBustedFile(fileName) {
@@ -459,6 +502,17 @@ gulp.task('package', ['dist:structure'], function () {
         cwd: path.distStatic
     }).pipe(clean());
     return merge(topDistStatic, combinedStatic);
+});
+
+// create distro + cleanup unucessary files
+gulp.task('bower', function () {
+    var bwr = doForEachApp(function (appName) {
+
+
+    }, 'structure', 'moving template files');
+
+    return bwr;
+
 });
 
 /******* startup taks *******/

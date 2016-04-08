@@ -23,9 +23,9 @@
                 if (path[0] === '/') {
                     path = path.substr(1);
                 }
-                return window.CONFIG.STATICDIR + path + '/app/' + window.CONFIG.APP + '/';
+                return window.CONFIG.SOLUTIONDIR + window.CONFIG.APP + '/' + path;
             }
-            return window.CONFIG.STATICDIR;
+            return window.CONFIG.SOLUTIONDIR;
         })
         .constant('globalGetApiRoot', function (path) {
             if (!window.CONFIG) {

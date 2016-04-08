@@ -1,5 +1,6 @@
 {
     "common": {
         "solution": "Your test solution"
-    }
+    },
+    "apps": ["app_one", "app_two", "shared"]
 }

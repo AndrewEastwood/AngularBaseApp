@@ -1,0 +1,26 @@
+{
+    "debug": {
+        "cookieHost": "localhost",
+        "hostname": "http://localhost/",
+        "apiUrl": "",
+        "gaKey": ""
+    },
+    "dev": {
+        "cookieHost": "",
+        "hostname": "",
+        "apiUrl": "",
+        "gaKey": ""
+    },
+    "stage": {
+        "cookieHost": "",
+        "hostname": "",
+        "apiUrl": "",
+        "gaKey": ""
+    },
+    "prod": {
+        "cookieHost": "",
+        "hostname": "",
+        "apiUrl": "",
+        "gaKey": ""
+    }
+}
