@@ -2,5 +2,11 @@
     "common": {
         "solution": "Your test solution"
     },
-    "apps": ["app_one", "app_two", "shared"]
+    "apps": ["app_one", "app_two", "shared"],
+    "base": {
+        "cookieHost": "",
+        "hostname": "",
+        "apiUrl": "",
+        "gaKey": ""
+    }
 }

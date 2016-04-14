@@ -24,78 +24,280 @@ var ngHtml2Js = require("gulp-ng-html2js");
 var inlineCss = require('gulp-inline-css');
 var bower = require('gulp-bower');
 
-// application's main config file
-var config = require('./config.json'),
-    // get local configuration
-    // configLocal = {},
+var
+    // application's main config file
+    config = require('./config.json'),
+    // srcDir = 'src/',
+    // distDir = 'dist/',
     env = (argv.env || 'debug').toLowerCase(),
     isBuild = env !== 'debug',
     uglifySources = !/debug|dev/.test(env),
     buildVersion = (new Date()).getTime(),
-    buildVersionUrlParam = '?bust=' + buildVersion,
-    apps = Object.getOwnPropertyNames(config.apps);
+    apps = config.apps || [],
+    baseConfig = config.base;
+
+
+if (!baseConfig) {
+    throw "Cannot find base configuration in the main config.json";
+}
+
+if (apps.length === 0) {
+    throw "No applications";
+}
 
 // // load local config file
 // if (fs.existsSync('./config_local.json')) {
-//     gutil.log('Using local config file: config_local.json');
+//     logger('Using local config file: config_local.json');
 //     configLocal = require('./config_local.json');
 // }
 
 // set new app path in case of build mode
 if (isBuild) {
-    gutil.log('OMG! It\'s production build');
+    logger('OMG! It\'s production build');
     path.app = path.dist;
 }
 
-gutil.log('Running env = ' + env);
-gutil.log('[path] src = ' + path.src);
-gutil.log('[path] dist = ' + path.dist);
-gutil.log('[path] app = ' + path.app);
-gutil.log('[path] urlStatic = ' + path.urlStatic);
-gutil.log('[path] distStatic = ' + path.distStatic);
-gutil.log('[path] pathToVendors = ' + pathToVendors);
-gutil.log('[path] pathToLibs= ' + pathToLibs);
-gutil.log('[path] pathToBowerJson = ' + pathToBowerJson);
+
+function logger () {
+    gutil.log(arguments);
+}
+
+logger('Running env = ' + env);
+// logger('[path] src = ' + path.src);
+// logger('[path] dist = ' + path.dist);
+// logger('[path] app = ' + path.app);
+// logger('[path] urlStatic = ' + path.urlStatic);
+// logger('[path] distStatic = ' + path.distStatic);
+// logger('[path] pathToVendors = ' + pathToVendors);
+// logger('[path] pathToLibs= ' + pathToLibs);
+// logger('[path] pathToBowerJson = ' + pathToBowerJson);
 
 
-function theApp (name) {
+logger('Available apps: ', apps);
 
-    var dirVendors = 'vendors/',
-        dirLibs = 'libs/',
-        pathToBowerJson = './bower.json',
+
+
+
+gulp.task('default', taskBuildAll);
+
+return;
+
+
+// default task
+if (isBuild) {
+    gulp.task('default', taskBuildAll);
+}
+//} else {
+//     gulp.task('default', ['app:html'], watchLocalChanges);
+// }
+
+
+/******* startup taks *******/
+function taskBuildAll () {
+    return doForEachApp(function (appName) {
+        var app = new Application(appName);
+        app.configure(baseConfig);
+        app.setBuildMode(buildVersion, isBuild);
+        return app.buildAll();
+    });
+}
+
+
+
+
+function Application (name) {
+    logger('creating new instance ' + name);
+
+    var that = this,
+        buildVersion = null,
+        env = null,
+        baseCfg = null,
+        srcRoot = 'src/',
+        distRoot = 'dist/',
+        // dirSrcVendors = name + '/static/vendors/',
+        // dirLibs = 'libs/', 
+        pathToBowerJson = withinAppSrcDir('bower.json'),
+        pathToConfigJson = withinAppSrcDir('config.json'),
         path = {
-            src: 'ui/src/',
-            dist: 'ui/dist/',
-            app: 'ui/src/',
-            urlStatic: isBuild ? '/static/' + buildVersion + '/' : '/',
-            distStatic: 'ui/dist/' + (isBuild ? 'static/' + buildVersion + '/' : '')
-        }
-        pathToVendors = path.app + dirVendors,
-        pathToLibs = path.app + dirLibs;
+            // app: 'src/' + name + '/',
+            // dist: 'dist/' + name + '/',
+            // srcApp: 'src/' + name + '/',
+            // distApp: 'dist/' + name + '/',
 
-    this.getConfig = function () {
-        return {
+            // // static path
+            // innerSrcStatic: '/static/',
+            // innerDistStatic: '/static/' + buildVersion + '/',
 
+            // // urls
+            // srcStaticUrl: '/static/',
+            // distStaticUrl: '/static/' + buildVersion + '/'
+            // distStatic: 'dist/' + (isBuild ? 'static/' + buildVersion + '/' : '')
         }
+        // pathToVendors = path.app + dirVendors,
+        // pathToLibs = path.app + dirLibs,
+        appConfigGeneral = require(pathToConfigJson),
+        appConfig = null;
+
+    // this.getConfig = function () {
+    //     return {
+    //     }
+    // }
+
+    function getBuildVersionUrlParam () {
+        return '?bust=' + that.getBuildVer(),
+    }
+
+    function withinAppSrcDir (p) {
+        return srcRoot + name + '/' + p,
+    }
+
+    function withinAppDistDir (p) {
+        return distRoot + name + '/' + p,
+    }
+
+    function getStaticPath () {
+        return '/static/';
+    }
+
+    function setAppConfig (c) {
+        appConfig = c || {};
+    }
+
+    function applogger () {
+        logger('    [' + name + '] ', arguments);
+    }
+
+    this.getAppName = function () {
+        return appName;
+    }
+
+    this.setBuildVer = function (v) {
+        applogger('build #', v);
+        buildVersion = v;
+        that.configure(that.getBaseConfig());
+    }
+    this.getBuildVer = function () {
+        return buildVersion;
+    }
+
+    this.setEnv = function (e) {
+        env = !!e ? e.toLowerCase() : 'debug';
+        applogger('env ', env);
+        that.configure(that.getBaseConfig());
+    }
+
+    this.getEnv = function () {
+        return env || 'debug';
+    }
+
+    this.setBuildMode = function (ver, env) {
+        setBuildVer(ver);
+        setEnv(env);
+    }
+
+    this.setBaseConfig = function (base) {
+        baseConfig = base || {};
+        that.configure(that.getBaseConfig());
+    }
+
+    this.getBaseConfig = function () {
+        return base || {};
+    }
+
+    this.configure = function (baseConfig) {
+        that.setBaseConfig(baseConfig);
+        var appCurrEnvCfg = appConfig[that.getEnv()],
+            common = {};
+        if (appConfig.common) {
+            common = appConfig.common;
+        }
+        setAppConfig(extend(true, that.getBaseConfig(), common, appCurrEnvCfg));
+        return that.getAppConfig();
+    }
+
+    this.getAppConfig = function () {
+        return appConfig || {};
+    }
+
+    this.getTplConfigObj = function () {
+        var appConfig = that.getAppConfig();
+        appConfig.VERSION = buildVersion;
+        appConfig.DEBUG = !isBuild;
+        appConfig.ENV = env;
+        appConfig.STATICDIR = path.urlStatic;
+        // adding both local and common values
+        // if (configLocal[appName]) {
+        //     appConfig = extend(true, config.common, appConfig, configLocal[appName]);
+        // } else {
+        //     appConfig = extend(true, config.common, appConfig);
+        // }
+        var appvars = {
+            CONFIG: JSON.stringify(appConfig),
+            CONFIGJSON: appConfig,
+            STATICDIR: getStaticPath(),
+            VERSION: that.getBuildVer(),
+            BUST: getBuildVersionUrlParam(),
+            APP: that.getAppName()
+        };
+        return appvars;
+    }
+
+
+    this.p_InstallBowerDeps = function () {
+        return bower({ directory: , cwd:  })
+    }
+
+
+    this.hasEnvConfig = function (env) {
+        if (env) {
+            return config && config.apps && config.apps[name] && config.apps[name][env];
+        }
+        return config && config.apps && config.apps[name];
+    }
+
+    this.buildAll = function () {
+        return nop();
+    }
+
+    // source transformation
+
+    function clearDist () {
+        
+    }
+    function copyFiles () {
+
+    }
+    function transformTemplate () {
+
+    }
+    function transformLess () {
+
+    }
+    function compressAppJs () {
+
+    }
+    function compressVendorsJs () {
+
+    }
+    function compressLibJs () {
+
+    }
+    function cleanup () {
+
+    }
+    function createPackage () {
+
     }
 }
 
-theApp.prototype.hasEnvConfig = function (appName, env) {
-    if (env) {
-        return config && config.apps && config.apps[appName] && config.apps[appName][env];
-    }
-    return config && config.apps && config.apps[appName];
-}
 
-theApp.prototype.build = function () {
 
-}
 
-function doForEachApp(cb, taskOwner, summary) {
+function doForEachApp(cb) {
     var seriesTasks = merge();
-    gutil.log('[' + taskOwner + '] running through apps:');
+    // logger('[' + taskOwner + '] running through apps:');
     apps.forEach(function (appName) {
-        gutil.log('    [' + appName + '] ' + (summary || ''));
+        logger('    running the [' + appName + ']');
         var task = cb(appName);
         if (task !== false) {
             seriesTasks.add(task);
@@ -114,21 +316,6 @@ function watchLocalChanges() {
     gulp.watch('.jshintrc', ['app:lintjs']);
 }
 
-/******* startup taks *******/
-
-// default task
-if (isBuild) {
-    gulp.task('default', ['package']);
-} else {
-    gulp.task('default', ['app:html'], watchLocalChanges);
-}
-
-
-doForEachApp(function () {
-
-})
-
-
 
 
 // simple wrapper for injected files lthat adds the bust param
@@ -138,7 +325,7 @@ function getBustedFile(fileName) {
 
 // this injects custom variables directly into source
 function injectAppVars(appName) {
-    gutil.log('        [injectAppVars:' + appName + ']');
+    logger('        [injectAppVars:' + appName + ']');
     var appConfig = config.apps[appName][env];
     // update config (combine common with local and env configs)
     appConfig.VERSION = buildVersion;
@@ -173,7 +360,7 @@ function transform(filepath, file, i, length) {
 }
 
 function injectAppScripts(appName) {
-    gutil.log('        [injectAppScripts]');
+    logger('        [injectAppScripts]');
     var jsAppFiles = [];
     if (isBuild) {
         jsAppFiles = ['solution/' + appName + '/' + appName + '.js'];
@@ -191,7 +378,7 @@ function injectAppScripts(appName) {
 }
 
 function injectVendors() {
-    gutil.log('        [injectVendorScripts]');
+    logger('        [injectVendorScripts]');
     var jsVendorsFiles = [];
     if (isBuild) {
         jsVendorsFiles = ['solution/vendors.js'];
@@ -215,7 +402,7 @@ function injectVendors() {
 }
 
 function injectLibs() {
-    gutil.log('        [injectAppLibs]');
+    logger('        [injectAppLibs]');
     var jsAppFiles = [];
     if (isBuild) {
         jsAppFiles = ['solution/libs.js'];
@@ -233,7 +420,7 @@ function injectLibs() {
 }
 
 function handleError(err) {
-    gutil.log(err.toString());
+    logger(err.toString());
     this.emit('end');
 }
 
@@ -256,12 +443,12 @@ function genHtml() {
 }
 
 function cleanCss() {
-    gutil.log('[cleanCss]');
+    logger('[cleanCss]');
     return gulp.src(path.app + 'assets/css/').pipe(clean());
 }
 
 function initCss() {
-    gutil.log('[initCss]');
+    logger('[initCss]');
     return doForEachApp(function (appName) {
         if (!hasEnvConfig(appName)) {
             return false;
@@ -280,12 +467,12 @@ function initCss() {
 }
 
 function genCss() {
-    gutil.log('[genCss]');
+    logger('[genCss]');
     return doForEachApp(function (appName) {
         if (!hasEnvConfig(appName)) {
             return false;
         }
-        gutil.log('    current path: ' + path.app + 'assets/css/' + appName + '/');
+        logger('    current path: ' + path.app + 'assets/css/' + appName + '/');
         return gulp.src('*.less', {
                 cwd: path.app + 'assets/css/' + appName + '/'
             })
@@ -305,7 +492,7 @@ function genCss() {
 }
 
 function lintJs() {
-    gutil.log('[lintJs]');
+    logger('[lintJs]');
     return doForEachApp(function (appName) {
         return gulp.src(['solution/' + appName + '/**/*.js'], {
                 cwd: path.app
@@ -379,7 +566,7 @@ gulp.task('dist:copy', ['dist:clean'], function () {
 });
 
 // generates css + lint js files
-gulp.task('dist:css:init', ['dist:copy'], initCss);
+gulp.task('dist:css:init', ['dist:copy'], initCss);l
 gulp.task('dist:css:transform', ['dist:css:init'], genCss);
 gulp.task('dist:css', ['dist:css:transform'], function () {
     return gulp.src(['assets/css/**/*.less', 'assets/css/**/_**'], {
