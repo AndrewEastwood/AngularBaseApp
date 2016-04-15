@@ -30,7 +30,6 @@ var
     // srcDir = 'src/',
     // distDir = 'dist/',
     env = (argv.env || 'debug').toLowerCase(),
-    isBuild = env !== 'debug',
     uglifySources = !/debug|dev/.test(env),
     buildVersion = (new Date()).getTime(),
     apps = config.apps || [],
@@ -97,7 +96,7 @@ function taskBuildAll () {
     return doForEachApp(function (appName) {
         var app = new Application(appName);
         app.configure(baseConfig);
-        app.setBuildMode(buildVersion, isBuild);
+        app.setBuildMode(buildVersion, env);
         return app.buildAll();
     });
 }
@@ -114,11 +113,24 @@ function Application (name) {
         baseCfg = null,
         srcRoot = 'src/',
         distRoot = 'dist/',
+        staticName = 'static',
         // dirSrcVendors = name + '/static/vendors/',
         // dirLibs = 'libs/', 
         pathToBowerJson = withinAppSrcDir('bower.json'),
         pathToConfigJson = withinAppSrcDir('config.json'),
         path = {
+            src: {
+                app: toF(withinAppSrcDir()),
+                static: toF(withinAppSrcDir('static/')),
+                assets: toF(withinAppSrcDir(combinePath('static', 'assets'))),
+                urlStatic: toF('/static/')
+            },
+            dist: {
+                app: toF(withinAppSrcDir()),
+                static: toF(withinAppSrcDir('static_' +  + '/')),
+                assets: toF(withinAppSrcDir(combinePath(getStaticName, 'assets'))),
+                urlStatic: toF('/static/')
+            }
             // app: 'src/' + name + '/',
             // dist: 'dist/' + name + '/',
             // srcApp: 'src/' + name + '/',
@@ -138,21 +150,54 @@ function Application (name) {
         appConfigGeneral = require(pathToConfigJson),
         appConfig = null;
 
+
     // this.getConfig = function () {
     //     return {
     //     }
     // }
+
+    function toF (f) {
+        return function () {
+            if (typeof f === 'function') {
+                return f();
+            }
+            return f;
+        }
+    }
+
+    function getStaticName () {
+        if (isBuild()) {
+            return staticName + '_' + that.getBuildVer();
+        }
+        return staticName;
+    }
+
+    function combinePath () {
+        return [].slice.call(arguments, 0).join('/');
+    }
+
+    function isBuild () {
+        return that.getEnv() !== 'debug';
+    }
+
+    function setRuntimePathAppToDist () {
+        path.run = path.dist;
+    }
+
+    function setRuntimePathAppToSrc () {
+        path.run = path.src;
+    }
 
     function getBuildVersionUrlParam () {
         return '?bust=' + that.getBuildVer(),
     }
 
     function withinAppSrcDir (p) {
-        return srcRoot + name + '/' + p,
+        return srcRoot + name + '/' + p || '',
     }
 
     function withinAppDistDir (p) {
-        return distRoot + name + '/' + p,
+        return distRoot + name + '/' + p || '',
     }
 
     function getStaticPath () {
@@ -222,9 +267,9 @@ function Application (name) {
     this.getTplConfigObj = function () {
         var appConfig = that.getAppConfig();
         appConfig.VERSION = buildVersion;
-        appConfig.DEBUG = !isBuild;
+        appConfig.DEBUG = !isBuild();
         appConfig.ENV = env;
-        appConfig.STATICDIR = path.urlStatic;
+        appConfig.STATICDIR = path.app.static;
         // adding both local and common values
         // if (configLocal[appName]) {
         //     appConfig = extend(true, config.common, appConfig, configLocal[appName]);
@@ -261,31 +306,91 @@ function Application (name) {
 
     // source transformation
 
-    function clearDist () {
+    function p_clearDist () {
+        return gulp.src('ui/dist').pipe(clean());
+    }
+    function p_copyFiles () {
+
+    }
+    function p_clearCss () {
+        applogger('[cleanCss]');
+        return gulp.src(path.app + 'assets/css/').pipe(clean());
+    }
+    function p_genCss () {
+        applogger('[cleanCss]');
+        return gulp.src('*.less', {
+                cwd: path.app + 'assets/css/' + appName + '/'
+            })
+            .pipe(plumber({
+                errorHandler: handleError
+            }))
+            .pipe(less({
+                paths: [path.app, path.app + 'assets/css/', path.app + 'assets/css/' + appName + '/']
+            }))
+            .pipe(uglifySources ? minifyCss({
+                processImport: false
+            }) : nop())
+            .pipe(gulp.dest('.', {
+                cwd: path.app + 'assets/css/' + appName + '/'
+            }));
+    }
+    function p_transformTemplate () {
+        return gulp.src('index.tpl.html', {
+                cwd: path.src.app
+            })
+            .pipe(injectAppVars(appName))
+            .pipe(injectAppScripts(appName))
+            .pipe(injectAppScripts('shared'))
+            .pipe(injectVendors())
+            .pipe(injectLibs())
+            .pipe(rename(appName + '.html'))
+            .pipe(gulp.dest(path.app));
+    }
+    function p_transformLess () {
+
+    }
+    function p_compressAppJs () {
+
+    }
+    function p_compressVendorsJs () {
+
+    }
+    function p_compressLibJs () {
+
+    }
+    function p_injectVars () {
         
     }
-    function copyFiles () {
+    function p_injectStatic () {
 
     }
-    function transformTemplate () {
+    function p_injectVendors () {
+        applogger('        [injectVendorScripts]');
+        var jsVendorsFiles = [];
+        if (isBuild()) {
+            jsVendorsFiles = ['app/vendors.js'];
+        } else {
+            jsVendorsFiles = bowerFiles({
+                filter: /.*\.js$/,
+                paths: {
+                    bowerJson: pathToBowerJson,
+                    bowerDirectory: pathToVendors
+                }
+            });
+        }
+        // console.dir(jsVendorsFiles);
+        return inject(gulp.src(jsVendorsFiles, {
+            cwd: path.app
+        }), {
+            relative: true,
+            transform: transform,
+            name: 'bower'
+        });
+    }
+    function p_cleanup () {
 
     }
-    function transformLess () {
-
-    }
-    function compressAppJs () {
-
-    }
-    function compressVendorsJs () {
-
-    }
-    function compressLibJs () {
-
-    }
-    function cleanup () {
-
-    }
-    function createPackage () {
+    function p_createPackage () {
 
     }
 }
