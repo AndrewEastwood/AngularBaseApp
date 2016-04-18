@@ -51,14 +51,14 @@ if (apps.length === 0) {
 // }
 
 // set new app path in case of build mode
-if (isBuild) {
-    logger('OMG! It\'s production build');
-    path.app = path.dist;
-}
+// if (isBuild) {
+//     logger('OMG! It\'s production build');
+//     path.app = path.dist;
+// }
 
 
 function logger () {
-    gutil.log(arguments);
+    gutil.log([].slice.call(arguments).join(' '));
 }
 
 logger('Running env = ' + env);
@@ -95,8 +95,7 @@ if (isBuild) {
 function taskBuildAll () {
     return doForEachApp(function (appName) {
         var app = new Application(appName);
-        app.configure(baseConfig);
-        app.setBuildMode(buildVersion, env);
+        app.configure(baseConfig, buildVersion, env);
         return app.buildAll();
     });
 }
@@ -105,31 +104,155 @@ function taskBuildAll () {
 
 
 function Application (name) {
-    logger('creating new instance ' + name);
+    applogger(name, 'creating new instance');
 
-    var that = this,
-        buildVersion = null,
+    var buildVersion = null,
         env = null,
         baseCfg = null,
-        srcRoot = 'src/',
-        distRoot = 'dist/',
+        srcRoot = './src/',
+        distRoot = './dist/',
         staticName = 'static',
         // dirSrcVendors = name + '/static/vendors/',
         // dirLibs = 'libs/', 
         pathToBowerJson = withinAppSrcDir('bower.json'),
         pathToConfigJson = withinAppSrcDir('config.json'),
+        path = null,
+        // pathToVendors = path.app + dirVendors,
+        // pathToLibs = path.app + dirLibs,
+        appConfigGeneral = require(pathToConfigJson),
+        appConfig = null;
+
+
+    // this.getConfig = function () {
+    //     return {
+    //     }
+    // }
+
+    // function toF (f) {
+    //     return function () {
+    //         if (typeof f === 'function') {
+    //             return f();
+    //         }
+    //         return f;
+    //     }
+    // }
+
+    function getStaticName () {
+        if (isBuild()) {
+            return staticName + '_' + getBuildVer();
+        }
+        return staticName;
+    }
+
+    function combinePath () {
+        var parts = [].slice.call(arguments, 0);
+        for (var k in parts) {
+            if (typeof parts[k] === 'function') {
+                parts[k] = parts[k]();
+            }
+        }
+        return parts.join('/').replace(/\/\//g, '/');
+    }
+
+    function isBuild () {
+        return getEnv() !== 'debug';
+    }
+
+    function setRuntimePathAppToDist () {
+        if (path.run) throw 'Runtime path is set';
+        path.run = path.dist;
+    }
+
+    function setRuntimePathAppToSrc () {
+        if (path.run) throw 'Runtime path is set';
+        path.run = path.src;
+    }
+
+    function getBuildVersionUrlParam () {
+        return '?bust=' + getBuildVer();
+    }
+
+    function withinAppSrcDir (p) {
+        return srcRoot + name + '/' + (!!p ? p : '');
+    }
+
+    function withinAppDistDir (p) {
+        return distRoot + name + '/' + (!!p ? p : '');
+    }
+
+    // function getStaticPath () {
+    //     return '/static/';
+    // }
+
+    function setAppConfig (c) {
+        appConfig = c || {};
+    }
+
+    function applogger () {
+        logger('    [' + name + '] ', [].slice.call(arguments).join(' '));
+    }
+
+    this.getAppName = function () {
+        return appName;
+    }
+
+    function setBuildVer (v) {
+        applogger('build #', v);
+        buildVersion = v;
+        // that.configure(that.getBaseConfig());
+    }
+    function getBuildVer () {
+        return buildVersion;
+    }
+
+    function setEnv (e) {
+        env = !!e ? e.toLowerCase() : 'debug';
+        applogger('env ', env);
+        // that.configure(that.getBaseConfig());
+    }
+
+    function getEnv () {
+        return env;
+    }
+
+    function setBuildMode (ver, env) {
+        setBuildVer(ver);
+        setEnv(env);
+    }
+
+    function setBaseConfig (base) {
+        baseCfg = base || {};
+        // that.configure(that.getBaseConfig());
+    }
+
+    function getBaseConfig () {
+        return baseCfg || {};
+    }
+
+    this.configure = function (baseConfig, ver, env) {
+        if (getEnv()) throw 'App is already configured';
+        setBaseConfig(baseConfig);
+        setBuildMode(ver, env);
+        var appCurrEnvCfg = appConfigGeneral[getEnv()],
+            common = {};
+        if (appConfigGeneral.common) {
+            common = appConfigGeneral.common;
+        }
+        setAppConfig(extend(true, getBaseConfig(), common, appCurrEnvCfg));
         path = {
             src: {
-                app: toF(withinAppSrcDir()),
-                static: toF(withinAppSrcDir('static/')),
-                assets: toF(withinAppSrcDir(combinePath('static', 'assets'))),
-                urlStatic: toF('/static/')
+                app: withinAppSrcDir(),
+                static: withinAppSrcDir(getStaticName),
+                assets: combinePath(withinAppSrcDir, getStaticName, 'assets'),
+                vendors: combinePath(withinAppSrcDir, getStaticName, 'vendors'),
+                urlStatic: combinePath('', getStaticName, '')
             },
             dist: {
-                app: toF(withinAppSrcDir()),
-                static: toF(withinAppSrcDir('static_' +  + '/')),
-                assets: toF(withinAppSrcDir(combinePath(getStaticName, 'assets'))),
-                urlStatic: toF('/static/')
+                app: withinAppDistDir(),
+                static: combinePath(withinAppDistDir, getStaticName),
+                assets: combinePath(withinAppDistDir, getStaticName, 'assets'),
+                vendors: combinePath(withinAppDistDir, getStaticName, 'vendors'),
+                urlStatic: combinePath('', getStaticName, '')
             }
             // app: 'src/' + name + '/',
             // dist: 'dist/' + name + '/',
@@ -144,128 +267,21 @@ function Application (name) {
             // srcStaticUrl: '/static/',
             // distStaticUrl: '/static/' + buildVersion + '/'
             // distStatic: 'dist/' + (isBuild ? 'static/' + buildVersion + '/' : '')
-        }
-        // pathToVendors = path.app + dirVendors,
-        // pathToLibs = path.app + dirLibs,
-        appConfigGeneral = require(pathToConfigJson),
-        appConfig = null;
-
-
-    // this.getConfig = function () {
-    //     return {
-    //     }
-    // }
-
-    function toF (f) {
-        return function () {
-            if (typeof f === 'function') {
-                return f();
-            }
-            return f;
-        }
-    }
-
-    function getStaticName () {
+        };
         if (isBuild()) {
-            return staticName + '_' + that.getBuildVer();
+            setRuntimePathAppToDist();
+        } else {
+            setRuntimePathAppToSrc();
         }
-        return staticName;
+        return getAppConfig();
     }
 
-    function combinePath () {
-        return [].slice.call(arguments, 0).join('/');
-    }
-
-    function isBuild () {
-        return that.getEnv() !== 'debug';
-    }
-
-    function setRuntimePathAppToDist () {
-        path.run = path.dist;
-    }
-
-    function setRuntimePathAppToSrc () {
-        path.run = path.src;
-    }
-
-    function getBuildVersionUrlParam () {
-        return '?bust=' + that.getBuildVer(),
-    }
-
-    function withinAppSrcDir (p) {
-        return srcRoot + name + '/' + p || '',
-    }
-
-    function withinAppDistDir (p) {
-        return distRoot + name + '/' + p || '',
-    }
-
-    function getStaticPath () {
-        return '/static/';
-    }
-
-    function setAppConfig (c) {
-        appConfig = c || {};
-    }
-
-    function applogger () {
-        logger('    [' + name + '] ', arguments);
-    }
-
-    this.getAppName = function () {
-        return appName;
-    }
-
-    this.setBuildVer = function (v) {
-        applogger('build #', v);
-        buildVersion = v;
-        that.configure(that.getBaseConfig());
-    }
-    this.getBuildVer = function () {
-        return buildVersion;
-    }
-
-    this.setEnv = function (e) {
-        env = !!e ? e.toLowerCase() : 'debug';
-        applogger('env ', env);
-        that.configure(that.getBaseConfig());
-    }
-
-    this.getEnv = function () {
-        return env || 'debug';
-    }
-
-    this.setBuildMode = function (ver, env) {
-        setBuildVer(ver);
-        setEnv(env);
-    }
-
-    this.setBaseConfig = function (base) {
-        baseConfig = base || {};
-        that.configure(that.getBaseConfig());
-    }
-
-    this.getBaseConfig = function () {
-        return base || {};
-    }
-
-    this.configure = function (baseConfig) {
-        that.setBaseConfig(baseConfig);
-        var appCurrEnvCfg = appConfig[that.getEnv()],
-            common = {};
-        if (appConfig.common) {
-            common = appConfig.common;
-        }
-        setAppConfig(extend(true, that.getBaseConfig(), common, appCurrEnvCfg));
-        return that.getAppConfig();
-    }
-
-    this.getAppConfig = function () {
+    function getAppConfig () {
         return appConfig || {};
     }
 
-    this.getTplConfigObj = function () {
-        var appConfig = that.getAppConfig();
+    function getTplConfigObj () {
+        var appConfig = getAppConfig();
         appConfig.VERSION = buildVersion;
         appConfig.DEBUG = !isBuild();
         appConfig.ENV = env;
@@ -280,18 +296,17 @@ function Application (name) {
             CONFIG: JSON.stringify(appConfig),
             CONFIGJSON: appConfig,
             STATICDIR: getStaticPath(),
-            VERSION: that.getBuildVer(),
+            VERSION: getBuildVer(),
             BUST: getBuildVersionUrlParam(),
-            APP: that.getAppName()
+            APP: getAppName()
         };
         return appvars;
     }
 
-
     this.p_InstallBowerDeps = function () {
-        return bower({ directory: , cwd:  })
+        return bower(path.src.vendors)
+            .pipe(gulp.dest(path.src.apps));
     }
-
 
     this.hasEnvConfig = function (env) {
         if (env) {
@@ -301,13 +316,14 @@ function Application (name) {
     }
 
     this.buildAll = function () {
-        return nop();
+        return p_clearDist();
     }
 
     // source transformation
 
     function p_clearDist () {
-        return gulp.src('ui/dist').pipe(clean());
+        applogger('cleaning ' + path.dist.app);
+        return gulp.src(path.dist.app).pipe(clean());
     }
     function p_copyFiles () {
 
@@ -402,7 +418,7 @@ function doForEachApp(cb) {
     var seriesTasks = merge();
     // logger('[' + taskOwner + '] running through apps:');
     apps.forEach(function (appName) {
-        logger('    running the [' + appName + ']');
+        logger('running the [' + appName + ']');
         var task = cb(appName);
         if (task !== false) {
             seriesTasks.add(task);
@@ -434,7 +450,7 @@ function injectAppVars(appName) {
     var appConfig = config.apps[appName][env];
     // update config (combine common with local and env configs)
     appConfig.VERSION = buildVersion;
-    appConfig.DEBUG = !isBuild;
+    appConfig.DEBUG = !isBuild();
     appConfig.ENV = env;
     appConfig.STATICDIR = path.urlStatic;
     // adding both local and common values
