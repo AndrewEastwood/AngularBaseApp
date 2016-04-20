@@ -23,6 +23,8 @@ var nop = require('gulp-nop');
 var ngHtml2Js = require("gulp-ng-html2js");
 var inlineCss = require('gulp-inline-css');
 var bower = require('gulp-bower');
+var runSequence = require('run-sequence');
+
 
 var
     // application's main config file
@@ -96,7 +98,7 @@ function taskBuildAll () {
     return doForEachApp(function (appName) {
         var app = new Application(appName);
         app.configure(baseConfig, buildVersion, env);
-        return app.buildAll();
+        return app.buildDist();
     });
 }
 
@@ -156,6 +158,10 @@ function Application (name) {
 
     function isBuild () {
         return getEnv() !== 'debug';
+    }
+
+    function uglifySources () {
+        return !/debug|dev/.test(env);
     }
 
     function setRuntimePathAppToDist () {
@@ -315,40 +321,48 @@ function Application (name) {
         return config && config.apps && config.apps[name];
     }
 
-    this.buildAll = function () {
-        return p_clearDist();
+    this.buildDist = function () {
+        var seriesTasks = merge();
+        seriesTasks.add(p_clearDist());
+        seriesTasks.add(p_copyFiles());
+        // seriesTasks.add(p_genCss());
+        return seriesTasks;
     }
 
     // source transformation
 
     function p_clearDist () {
         applogger('cleaning ' + path.dist.app);
-        return gulp.src(path.dist.app).pipe(clean());
+        return gulp.src(path.dist.app).pipe(clean()).on('end', function(){ applogger('cleaning: Done!'); });
     }
     function p_copyFiles () {
-
-    }
-    function p_clearCss () {
-        applogger('[cleanCss]');
-        return gulp.src(path.app + 'assets/css/').pipe(clean());
+        applogger('copying files to ' + path.dist.app);
+        return gulp.src(['**/*', '!assets/{css,css/**}'], {
+            cwd: path.src.app
+        }).pipe(gulp.dest(path.dist.app)).on('end', function(){ applogger('copying files to: Done!'); });
     }
     function p_genCss () {
-        applogger('[cleanCss]');
-        return gulp.src('*.less', {
-                cwd: path.app + 'assets/css/' + appName + '/'
+        applogger('generating css');
+        var seriesTasks = merge();
+        var clean = gulp.src(path.run.assets + 'css/').pipe(clean());
+        var gen = gulp.src('*.less', {
+                cwd: path.run.assets + 'css/'
             })
             .pipe(plumber({
                 errorHandler: handleError
             }))
             .pipe(less({
-                paths: [path.app, path.app + 'assets/css/', path.app + 'assets/css/' + appName + '/']
+                paths: [path.run.assets]
             }))
-            .pipe(uglifySources ? minifyCss({
+            .pipe(uglifySources() ? minifyCss({
                 processImport: false
             }) : nop())
             .pipe(gulp.dest('.', {
-                cwd: path.app + 'assets/css/' + appName + '/'
+                cwd: path.run.assets + 'css/'
             }));
+        seriesTasks.add(clean);
+        seriesTasks.add(gen);
+        return seriesTasks.on('end', function(){ applogger('generating css: Done!'); });
     }
     function p_transformTemplate () {
         return gulp.src('index.tpl.html', {
