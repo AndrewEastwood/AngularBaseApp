@@ -24,6 +24,7 @@ var ngHtml2Js = require("gulp-ng-html2js");
 var inlineCss = require('gulp-inline-css');
 var bower = require('gulp-bower');
 var runSequence = require('run-sequence');
+var asyncPipe = require('gulp-async-func-runner');
 
 
 var
