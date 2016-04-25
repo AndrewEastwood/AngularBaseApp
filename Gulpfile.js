@@ -140,6 +140,33 @@ function Application (name) {
     //     }
     // }
 
+    var tasks = {};
+    // key = task name
+    // value = function
+
+    function getTaskName (taskName) {
+        return getAppName() + '_' + taskName;
+    }
+
+    function registerAppTask (taskName, deps, cb) {
+        if (typeof deps === 'function' && typeof cb === 'undefined') {
+            return gulp.task(getTaskName(taskName), deps, cb);
+        }
+        return gulp.task(getTaskName(taskName), cb);
+    }
+
+    function runTasksAsync () {
+
+        var tasks = [].map.call([].slice.call(arguments, 0), getTaskName);
+        if (tasks.length === 1) {
+            return runSequence(tasks[0], [], cb);
+        }
+        if (tasks.length > 1) {
+            return runSequence(tasks[0], tasks.slice(1), cb);
+        }
+        return false;
+    }
+
     function getStaticName () {
         if (isBuild()) {
             return staticName + '_' + getBuildVer();
@@ -323,11 +350,7 @@ function Application (name) {
     }
 
     this.buildDist = function () {
-        var seriesTasks = merge();
-        seriesTasks.add(p_clearDist());
-        seriesTasks.add(p_copyFiles());
-        // seriesTasks.add(p_genCss());
-        return seriesTasks;
+        return runTasksAsync(p_clearDist, p_copyFiles, p_genCss);
     }
 
     // source transformation
@@ -336,12 +359,14 @@ function Application (name) {
         applogger('cleaning ' + path.dist.app);
         return gulp.src(path.dist.app).pipe(clean()).on('end', function(){ applogger('cleaning: Done!'); });
     }
+
     function p_copyFiles () {
         applogger('copying files to ' + path.dist.app);
         return gulp.src(['**/*', '!assets/{css,css/**}'], {
             cwd: path.src.app
         }).pipe(gulp.dest(path.dist.app)).on('end', function(){ applogger('copying files to: Done!'); });
     }
+
     function p_genCss () {
         applogger('generating css');
         var seriesTasks = merge();
@@ -365,6 +390,32 @@ function Application (name) {
         seriesTasks.add(gen);
         return seriesTasks.on('end', function(){ applogger('generating css: Done!'); });
     }
+
+    function p_cleanNonCss () {
+        return gulp.src(['assets/css/**/*.less', 'assets/css/**/_**'], {
+            cwd: path.app
+        }).pipe(clean());
+    }
+
+
+    registerAppTask('app:css', [cleanCss, initCss, genCss, p_cleanNonCss]);
+
+// function cleanCss() {
+//     logger('[cleanCss]');
+//     return gulp.src(path.app + 'assets/css/').pipe(clean());
+// }
+
+// // TODO: merge into one task and run them in sync
+// // compiles scss files into css
+// gulp.task('app:css:clean', cleanCss);
+// gulp.task('app:css:init', ['app:css:clean'], initCss);
+// gulp.task('app:css:transform', ['app:css:init'], genCss);
+// gulp.task('app:css', ['app:css:transform'], function () {
+//     return gulp.src(['assets/css/**/*.less', 'assets/css/**/_**'], {
+//         cwd: path.app
+//     }).pipe(clean());
+// });
+
     function p_transformTemplate () {
         return gulp.src('index.tpl.html', {
                 cwd: path.src.app
@@ -377,24 +428,31 @@ function Application (name) {
             .pipe(rename(appName + '.html'))
             .pipe(gulp.dest(path.app));
     }
+
     function p_transformLess () {
 
     }
+
     function p_compressAppJs () {
 
     }
+
     function p_compressVendorsJs () {
 
     }
+
     function p_compressLibJs () {
 
     }
+
     function p_injectVars () {
         
     }
+
     function p_injectStatic () {
 
     }
+
     function p_injectVendors () {
         applogger('        [injectVendorScripts]');
         var jsVendorsFiles = [];
@@ -418,12 +476,15 @@ function Application (name) {
             name: 'bower'
         });
     }
+
     function p_cleanup () {
 
     }
+
     function p_createPackage () {
 
     }
+
 }
 
 
