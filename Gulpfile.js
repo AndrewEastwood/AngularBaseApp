@@ -144,25 +144,49 @@ function Application (name) {
     // key = task name
     // value = function
 
+    function getTaskFnByTaskName (taskName) {
+        return tasks[getTaskName(taskName)];
+    }
+
+    function setTaskFn (taskName, cb) {
+        var appTaskName = getTaskName(taskName);
+        tasks[appTaskName] = cb;
+        return appTaskName;
+    }
+
+    function isTaskSet (taskName) {
+        return !!getTaskFnByTaskName(taskName);
+    }
+
     function getTaskName (taskName) {
         return getAppName() + '_' + taskName;
     }
 
-    function registerAppTask (taskName, deps, cb) {
-        if (typeof deps === 'function' && typeof cb === 'undefined') {
-            return gulp.task(getTaskName(taskName), deps, cb);
-        }
-        return gulp.task(getTaskName(taskName), cb);
+    function registerAppTask (taskName, cb) {
+        if (isTaskSet(taskName)) return true;
+        var gulpTaskName = setTaskFn(taskName, cb);
+        gulp.task(gulpTaskName, cb);
+        return true;
     }
 
-    function runTasksAsync () {
+    function registerAppTasks () {
+        var tasks = [].slice.call(arguments, 0);
+        for (var i = tasks.length - 1; i >= 0; i--) {
+            registerAppTask(tasks[i].name, task[i]);
+        }
+    }
 
-        var tasks = [].map.call([].slice.call(arguments, 0), getTaskName);
+    function runTasksAsync (/* functions */) {
+        var tasks = [].slice.call(arguments, 0),
+            gulpTasksNames = [].map.call(tasks, getTaskName);
+        
+        registerAppTasks(tasks);
+
         if (tasks.length === 1) {
-            return runSequence(tasks[0], [], cb);
+            return runSequence(gulpTasksNames[0], [], nop);
         }
         if (tasks.length > 1) {
-            return runSequence(tasks[0], tasks.slice(1), cb);
+            return runSequence(gulpTasksNames.pop(), tasks, cb);
         }
         return false;
     }
