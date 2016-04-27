@@ -103,11 +103,22 @@ function taskBuildAll () {
     });
 }
 
+function doForEachApp(cb) {
+    var merged = merge();
+    // logger('[' + taskOwner + '] running through apps:');
+    apps.forEach(function (appName) {
+        logger('running the [' + appName + ']');
+        var task = cb(appName);
+        if (task !== false) {
+            merged.add(task);
+        }
+    });
+    return merged;
+}
 
 
-
-function Application (name) {
-    applogger(name, 'creating new instance');
+function Application (appName) {
+    applogger(appName, 'creating new instance');
 
     var buildVersion = null,
         env = null,
@@ -162,9 +173,16 @@ function Application (name) {
         return getAppName() + '_' + taskName;
     }
 
-    function registerAppTask (taskName, cb) {
+    function getFunctionTaskName (fn) {
+        return getAppName() + '_' + fn.name;
+    }
+
+    function registerAppTask (cb) {
+        applogger(cb.name);
+        var taskName = cb.name;
         if (isTaskSet(taskName)) return true;
         var gulpTaskName = setTaskFn(taskName, cb);
+        applogger('registered in gulp as ' + gulpTaskName);
         gulp.task(gulpTaskName, cb);
         return true;
     }
@@ -172,23 +190,29 @@ function Application (name) {
     function registerAppTasks () {
         var tasks = [].slice.call(arguments, 0);
         for (var i = tasks.length - 1; i >= 0; i--) {
-            registerAppTask(tasks[i].name, task[i]);
+            if (typeof tasks[i] === 'function') {
+                registerAppTask(tasks[i]);
+            } else {
+                applogger('wrong argument occured! typeof = ' + typeof tasks[i]);
+            }
         }
     }
 
-    function runTasksAsync (/* functions */) {
-        var tasks = [].slice.call(arguments, 0),
-            gulpTasksNames = [].map.call(tasks, getTaskName);
-        
-        registerAppTasks(tasks);
+    function runTasksAsync (/* function pointers */) {
+        var tasks = [].slice.call(arguments, 0), // array of function pointers
+            gulpTasksNames = [].map.call(tasks, getFunctionTaskName); // array of scoped app task names
 
-        if (tasks.length === 1) {
-            return runSequence(gulpTasksNames[0], [], nop);
-        }
-        if (tasks.length > 1) {
-            return runSequence(gulpTasksNames.pop(), tasks, cb);
-        }
-        return false;
+        // registering missed tasks
+        registerAppTasks.apply(null, tasks);
+
+        applogger.apply(null, gulpTasksNames);
+        return runSequence.apply(null, gulpTasksNames);
+        // }
+        // if (tasks.length === 1) {
+        // if (tasks.length > 1) {
+        //     return runSequence(, gulpTasksNames, gulpTasksNames.pop());
+        // }
+        // return nop();
     }
 
     function getStaticName () {
@@ -231,11 +255,11 @@ function Application (name) {
     }
 
     function withinAppSrcDir (p) {
-        return srcRoot + name + '/' + (!!p ? p : '');
+        return srcRoot + getAppName() + '/' + (!!p ? p : '');
     }
 
     function withinAppDistDir (p) {
-        return distRoot + name + '/' + (!!p ? p : '');
+        return distRoot + getAppName() + '/' + (!!p ? p : '');
     }
 
     // function getStaticPath () {
@@ -247,10 +271,10 @@ function Application (name) {
     }
 
     function applogger () {
-        logger('    [' + name + '] ', [].slice.call(arguments).join(' '));
+        logger('    [' + getAppName() + '] fn [' + arguments.callee.caller.name + '] ', [].slice.call(arguments).join(' '));
     }
 
-    this.getAppName = function () {
+    function getAppName () {
         return appName;
     }
 
@@ -381,14 +405,16 @@ function Application (name) {
 
     function p_clearDist () {
         applogger('cleaning ' + path.dist.app);
-        return gulp.src(path.dist.app).pipe(clean()).on('end', function(){ applogger('cleaning: Done!'); });
+        return gulp.src(path.dist.app).pipe(clean())
+            .on('end', function(){ applogger('cleaning: Done!'); });
     }
 
     function p_copyFiles () {
         applogger('copying files to ' + path.dist.app);
         return gulp.src(['**/*', '!assets/{css,css/**}'], {
-            cwd: path.src.app
-        }).pipe(gulp.dest(path.dist.app)).on('end', function(){ applogger('copying files to: Done!'); });
+                cwd: path.src.app
+            }).pipe(gulp.dest(path.dist.app))
+            .on('end', function(){ applogger('copying files to: Done!'); });
     }
 
     function p_genCss () {
@@ -422,7 +448,7 @@ function Application (name) {
     }
 
 
-    registerAppTask('app:css', [cleanCss, initCss, genCss, p_cleanNonCss]);
+    // registerAppTask('app:css', [cleanCss, initCss, genCss, p_cleanNonCss]);
 
 // function cleanCss() {
 //     logger('[cleanCss]');
@@ -514,420 +540,409 @@ function Application (name) {
 
 
 
-function doForEachApp(cb) {
-    var seriesTasks = merge();
-    // logger('[' + taskOwner + '] running through apps:');
-    apps.forEach(function (appName) {
-        logger('running the [' + appName + ']');
-        var task = cb(appName);
-        if (task !== false) {
-            seriesTasks.add(task);
-        }
-    });
-    return seriesTasks;
-}
-
-function watchLocalChanges() {
-    // TDO: fix js first then uncomment
-    gulp.watch('ui/src/solution/**/*.js', ['app:lintjs']);
-    gulp.watch('ui/src/assets/styles/**', ['app:css']);
-    gulp.watch('ui/src/*.tpl.html', ['app:html']);
-    gulp.watch('config*.json', ['app:html']);
-    gulp.watch('bower.json', ['app:html']);
-    gulp.watch('.jshintrc', ['app:lintjs']);
-}
+// function watchLocalChanges() {
+//     // TDO: fix js first then uncomment
+//     gulp.watch('ui/src/solution/**/*.js', ['app:lintjs']);
+//     gulp.watch('ui/src/assets/styles/**', ['app:css']);
+//     gulp.watch('ui/src/*.tpl.html', ['app:html']);
+//     gulp.watch('config*.json', ['app:html']);
+//     gulp.watch('bower.json', ['app:html']);
+//     gulp.watch('.jshintrc', ['app:lintjs']);
+// }
 
 
 
-// simple wrapper for injected files lthat adds the bust param
-function getBustedFile(fileName) {
-    return path.urlStatic + fileName + buildVersionUrlParam;
-}
+// // simple wrapper for injected files lthat adds the bust param
+// function getBustedFile(fileName) {
+//     return path.urlStatic + fileName + buildVersionUrlParam;
+// }
 
-// this injects custom variables directly into source
-function injectAppVars(appName) {
-    logger('        [injectAppVars:' + appName + ']');
-    var appConfig = config.apps[appName][env];
-    // update config (combine common with local and env configs)
-    appConfig.VERSION = buildVersion;
-    appConfig.DEBUG = !isBuild();
-    appConfig.ENV = env;
-    appConfig.STATICDIR = path.urlStatic;
-    // adding both local and common values
-    if (configLocal[appName]) {
-        appConfig = extend(true, config.common, appConfig, configLocal[appName]);
-    } else {
-        appConfig = extend(true, config.common, appConfig);
-    }
-    var appvars = {
-        CONFIG: JSON.stringify(appConfig),
-        CONFIGJSON: appConfig,
-        STATICDIR: path.urlStatic,
-        VERSION: buildVersion,
-        BUST: buildVersionUrlParam,
-        APP: appName
-    };
-    return preprocess({
-        context: appvars
-    });
-}
+// // this injects custom variables directly into source
+// function injectAppVars(appName) {
+//     logger('        [injectAppVars:' + appName + ']');
+//     var appConfig = config.apps[appName][env];
+//     // update config (combine common with local and env configs)
+//     appConfig.VERSION = buildVersion;
+//     appConfig.DEBUG = !isBuild();
+//     appConfig.ENV = env;
+//     appConfig.STATICDIR = path.urlStatic;
+//     // adding both local and common values
+//     if (configLocal[appName]) {
+//         appConfig = extend(true, config.common, appConfig, configLocal[appName]);
+//     } else {
+//         appConfig = extend(true, config.common, appConfig);
+//     }
+//     var appvars = {
+//         CONFIG: JSON.stringify(appConfig),
+//         CONFIGJSON: appConfig,
+//         STATICDIR: path.urlStatic,
+//         VERSION: buildVersion,
+//         BUST: buildVersionUrlParam,
+//         APP: appName
+//     };
+//     return preprocess({
+//         context: appvars
+//     });
+// }
 
-function transform(filepath, file, i, length) {
-    if (filepath.indexOf('.js') > -1) {
-        return '<script crossorigin="anonymous" src="' + getBustedFile(filepath) + '"></script>';
-    } else {
-        return '<link rel="stylesheet" type="text/css" href="' + getBustedFile(filepath) + '"/>';
-    }
-}
+// function transform(filepath, file, i, length) {
+//     if (filepath.indexOf('.js') > -1) {
+//         return '<script crossorigin="anonymous" src="' + getBustedFile(filepath) + '"></script>';
+//     } else {
+//         return '<link rel="stylesheet" type="text/css" href="' + getBustedFile(filepath) + '"/>';
+//     }
+// }
 
-function injectAppScripts(appName) {
-    logger('        [injectAppScripts]');
-    var jsAppFiles = [];
-    if (isBuild) {
-        jsAppFiles = ['solution/' + appName + '/' + appName + '.js'];
-    } else {
-        jsAppFiles = ['solution/' + appName + '/app.js', 'solution/' + appName + '/**/*.js'];
-    }
-    return inject(gulp.src(jsAppFiles, {
-        read: false,
-        cwd: path.app
-    }), {
-        relative: true,
-        transform: transform,
-        name: appName
-    });
-}
+// function injectAppScripts(appName) {
+//     logger('        [injectAppScripts]');
+//     var jsAppFiles = [];
+//     if (isBuild) {
+//         jsAppFiles = ['solution/' + appName + '/' + appName + '.js'];
+//     } else {
+//         jsAppFiles = ['solution/' + appName + '/app.js', 'solution/' + appName + '/**/*.js'];
+//     }
+//     return inject(gulp.src(jsAppFiles, {
+//         read: false,
+//         cwd: path.app
+//     }), {
+//         relative: true,
+//         transform: transform,
+//         name: appName
+//     });
+// }
 
-function injectVendors() {
-    logger('        [injectVendorScripts]');
-    var jsVendorsFiles = [];
-    if (isBuild) {
-        jsVendorsFiles = ['solution/vendors.js'];
-    } else {
-        jsVendorsFiles = bowerFiles({
-            filter: /.*\.js$/,
-            paths: {
-                bowerJson: pathToBowerJson,
-                bowerDirectory: pathToVendors
-            }
-        });
-    }
-    // console.dir(jsVendorsFiles);
-    return inject(gulp.src(jsVendorsFiles, {
-        cwd: path.app
-    }), {
-        relative: true,
-        transform: transform,
-        name: 'bower'
-    });
-}
+// function injectVendors() {
+//     logger('        [injectVendorScripts]');
+//     var jsVendorsFiles = [];
+//     if (isBuild) {
+//         jsVendorsFiles = ['solution/vendors.js'];
+//     } else {
+//         jsVendorsFiles = bowerFiles({
+//             filter: /.*\.js$/,
+//             paths: {
+//                 bowerJson: pathToBowerJson,
+//                 bowerDirectory: pathToVendors
+//             }
+//         });
+//     }
+//     // console.dir(jsVendorsFiles);
+//     return inject(gulp.src(jsVendorsFiles, {
+//         cwd: path.app
+//     }), {
+//         relative: true,
+//         transform: transform,
+//         name: 'bower'
+//     });
+// }
 
-function injectLibs() {
-    logger('        [injectAppLibs]');
-    var jsAppFiles = [];
-    if (isBuild) {
-        jsAppFiles = ['solution/libs.js'];
-    } else {
-        jsAppFiles = ['libs/**/*.js'];
-    }
-    return inject(gulp.src(jsAppFiles, {
-        read: false,
-        cwd: path.app
-    }), {
-        relative: true,
-        transform: transform,
-        name: 'libs'
-    });
-}
+// function injectLibs() {
+//     logger('        [injectAppLibs]');
+//     var jsAppFiles = [];
+//     if (isBuild) {
+//         jsAppFiles = ['solution/libs.js'];
+//     } else {
+//         jsAppFiles = ['libs/**/*.js'];
+//     }
+//     return inject(gulp.src(jsAppFiles, {
+//         read: false,
+//         cwd: path.app
+//     }), {
+//         relative: true,
+//         transform: transform,
+//         name: 'libs'
+//     });
+// }
 
-function handleError(err) {
-    logger(err.toString());
-    this.emit('end');
-}
+// function handleError(err) {
+//     logger(err.toString());
+//     this.emit('end');
+// }
 
-function genHtml() {
-    return doForEachApp(function (appName) {
-        if (!hasEnvConfig(appName)) {
-            return false;
-        }
-        return gulp.src(appName + '.tpl.html', {
-                cwd: path.app
-            })
-            .pipe(injectAppVars(appName))
-            .pipe(injectAppScripts(appName))
-            .pipe(injectAppScripts('shared'))
-            .pipe(injectVendors())
-            .pipe(injectLibs())
-            .pipe(rename(appName + '.html'))
-            .pipe(gulp.dest(path.app));
-    }, 'genHtml', 'generating html');
-}
+// function genHtml() {
+//     return doForEachApp(function (appName) {
+//         if (!hasEnvConfig(appName)) {
+//             return false;
+//         }
+//         return gulp.src(appName + '.tpl.html', {
+//                 cwd: path.app
+//             })
+//             .pipe(injectAppVars(appName))
+//             .pipe(injectAppScripts(appName))
+//             .pipe(injectAppScripts('shared'))
+//             .pipe(injectVendors())
+//             .pipe(injectLibs())
+//             .pipe(rename(appName + '.html'))
+//             .pipe(gulp.dest(path.app));
+//     }, 'genHtml', 'generating html');
+// }
 
-function cleanCss() {
-    logger('[cleanCss]');
-    return gulp.src(path.app + 'assets/css/').pipe(clean());
-}
+// function cleanCss() {
+//     logger('[cleanCss]');
+//     return gulp.src(path.app + 'assets/css/').pipe(clean());
+// }
 
-function initCss() {
-    logger('[initCss]');
-    return doForEachApp(function (appName) {
-        if (!hasEnvConfig(appName)) {
-            return false;
-        }
-        return gulp.src([
-            'assets/styles/' + appName + '/*',
-            'assets/styles/' + appName + '/**',
-            'assets/styles/' + appName + '/**/*'], {
-                cwd: path.app
-            })
-            .pipe(injectAppVars(appName))
-            .pipe(gulp.dest(appName, {
-                cwd: path.app + 'assets/css/'
-            }));
-    }, 'initCss', 'generating css');
-}
+// function initCss() {
+//     logger('[initCss]');
+//     return doForEachApp(function (appName) {
+//         if (!hasEnvConfig(appName)) {
+//             return false;
+//         }
+//         return gulp.src([
+//             'assets/styles/' + appName + '/*',
+//             'assets/styles/' + appName + '/**',
+//             'assets/styles/' + appName + '/**/*'], {
+//                 cwd: path.app
+//             })
+//             .pipe(injectAppVars(appName))
+//             .pipe(gulp.dest(appName, {
+//                 cwd: path.app + 'assets/css/'
+//             }));
+//     }, 'initCss', 'generating css');
+// }
 
-function genCss() {
-    logger('[genCss]');
-    return doForEachApp(function (appName) {
-        if (!hasEnvConfig(appName)) {
-            return false;
-        }
-        logger('    current path: ' + path.app + 'assets/css/' + appName + '/');
-        return gulp.src('*.less', {
-                cwd: path.app + 'assets/css/' + appName + '/'
-            })
-            .pipe(plumber({
-                errorHandler: handleError
-            }))
-            .pipe(less({
-                paths: [path.app, path.app + 'assets/css/', path.app + 'assets/css/' + appName + '/']
-            }))
-            .pipe(uglifySources ? minifyCss({
-                processImport: false
-            }) : nop())
-            .pipe(gulp.dest('.', {
-                cwd: path.app + 'assets/css/' + appName + '/'
-            }));
-    }, 'genCss', 'generating css');
-}
+// function genCss() {
+//     logger('[genCss]');
+//     return doForEachApp(function (appName) {
+//         if (!hasEnvConfig(appName)) {
+//             return false;
+//         }
+//         logger('    current path: ' + path.app + 'assets/css/' + appName + '/');
+//         return gulp.src('*.less', {
+//                 cwd: path.app + 'assets/css/' + appName + '/'
+//             })
+//             .pipe(plumber({
+//                 errorHandler: handleError
+//             }))
+//             .pipe(less({
+//                 paths: [path.app, path.app + 'assets/css/', path.app + 'assets/css/' + appName + '/']
+//             }))
+//             .pipe(uglifySources ? minifyCss({
+//                 processImport: false
+//             }) : nop())
+//             .pipe(gulp.dest('.', {
+//                 cwd: path.app + 'assets/css/' + appName + '/'
+//             }));
+//     }, 'genCss', 'generating css');
+// }
 
-function lintJs() {
-    logger('[lintJs]');
-    return doForEachApp(function (appName) {
-        return gulp.src(['solution/' + appName + '/**/*.js'], {
-                cwd: path.app
-            })
-            .pipe(jshint())
-            .pipe(jshint.reporter(stylish))
-            .pipe(jshint.reporter('default'));
-    }, 'lintJs');
-}
+// function lintJs() {
+//     logger('[lintJs]');
+//     return doForEachApp(function (appName) {
+//         return gulp.src(['solution/' + appName + '/**/*.js'], {
+//                 cwd: path.app
+//             })
+//             .pipe(jshint())
+//             .pipe(jshint.reporter(stylish))
+//             .pipe(jshint.reporter('default'));
+//     }, 'lintJs');
+// }
 
-function compressAppTemplates() {
-    if (!isBuild) {
-        return false;
-    }
-    return doForEachApp(function (appName) {
-        if (!hasEnvConfig(appName)) {
-            return false;
-        }
-        return gulp.src('solution/' + appName + '/**/*.html', {
-                cwd: path.dist
-            })
-            .pipe(injectAppVars(appName))
-            .pipe(uglifySources ? minifyHTML() : nop())
-            .pipe(gulp.dest('solution/' + appName, {
-                cwd: path.dist
-            }));
-    }, 'appTpl', 'compressing templates');
-}
+// function compressAppTemplates() {
+//     if (!isBuild) {
+//         return false;
+//     }
+//     return doForEachApp(function (appName) {
+//         if (!hasEnvConfig(appName)) {
+//             return false;
+//         }
+//         return gulp.src('solution/' + appName + '/**/*.html', {
+//                 cwd: path.dist
+//             })
+//             .pipe(injectAppVars(appName))
+//             .pipe(uglifySources ? minifyHTML() : nop())
+//             .pipe(gulp.dest('solution/' + appName, {
+//                 cwd: path.dist
+//             }));
+//     }, 'appTpl', 'compressing templates');
+// }
 
-function watchLocalChanges() {
-    // TDO: fix js first then uncomment
-    gulp.watch('ui/src/solution/**/*.js', ['app:lintjs']);
-    gulp.watch('ui/src/assets/styles/**', ['app:css']);
-    gulp.watch('ui/src/*.tpl.html', ['app:html']);
-    gulp.watch('config*.json', ['app:html']);
-    gulp.watch('bower.json', ['app:html']);
-    gulp.watch('.jshintrc', ['app:lintjs']);
-}
+// function watchLocalChanges() {
+//     // TDO: fix js first then uncomment
+//     gulp.watch('ui/src/solution/**/*.js', ['app:lintjs']);
+//     gulp.watch('ui/src/assets/styles/**', ['app:css']);
+//     gulp.watch('ui/src/*.tpl.html', ['app:html']);
+//     gulp.watch('config*.json', ['app:html']);
+//     gulp.watch('bower.json', ['app:html']);
+//     gulp.watch('.jshintrc', ['app:lintjs']);
+// }
 
-// TODO: merge into one task and run them in sync
-// compiles scss files into css
-gulp.task('app:css:clean', cleanCss);
-gulp.task('app:css:init', ['app:css:clean'], initCss);
-gulp.task('app:css:transform', ['app:css:init'], genCss);
-gulp.task('app:css', ['app:css:transform'], function () {
-    return gulp.src(['assets/css/**/*.less', 'assets/css/**/_**'], {
-        cwd: path.app
-    }).pipe(clean());
-});
+// // TODO: merge into one task and run them in sync
+// // compiles scss files into css
+// gulp.task('app:css:clean', cleanCss);
+// gulp.task('app:css:init', ['app:css:clean'], initCss);
+// gulp.task('app:css:transform', ['app:css:init'], genCss);
+// gulp.task('app:css', ['app:css:transform'], function () {
+//     return gulp.src(['assets/css/**/*.less', 'assets/css/**/_**'], {
+//         cwd: path.app
+//     }).pipe(clean());
+// });
 
-// validates js
-gulp.task('app:lintjs', lintJs);
+// // validates js
+// gulp.task('app:lintjs', lintJs);
 
-// generates root htmls from tpl files
-gulp.task('app:html', ['app:css'], genHtml);
+// // generates root htmls from tpl files
+// gulp.task('app:html', ['app:css'], genHtml);
 
-gulp.task('app:watch', watchLocalChanges);
+// gulp.task('app:watch', watchLocalChanges);
 
-/************ build tasks **************/
+// /************ build tasks **************/
 
-// Delete the dist directory
-gulp.task('dist:clean', function () {
-    return gulp.src('ui/dist').pipe(clean());
-});
+// // Delete the dist directory
+// gulp.task('dist:clean', function () {
+//     return gulp.src('ui/dist').pipe(clean());
+// });
 
-// copy all files into dist dir
-gulp.task('dist:copy', ['dist:clean'], function () {
-    return gulp.src(['**/*', '!assets/{css,css/**}'], {
-        cwd: path.src
-    }).pipe(gulp.dest(path.dist));
-});
+// // copy all files into dist dir
+// gulp.task('dist:copy', ['dist:clean'], function () {
+//     return gulp.src(['**/*', '!assets/{css,css/**}'], {
+//         cwd: path.src
+//     }).pipe(gulp.dest(path.dist));
+// });
 
-// generates css + lint js files
-gulp.task('dist:css:init', ['dist:copy'], initCss);l
-gulp.task('dist:css:transform', ['dist:css:init'], genCss);
-gulp.task('dist:css', ['dist:css:transform'], function () {
-    return gulp.src(['assets/css/**/*.less', 'assets/css/**/_**'], {
-        cwd: path.app
-    }).pipe(clean());
-});
-// gulp.task('dist:css', ['dist:copy'], genCss);
+// // generates css + lint js files
+// gulp.task('dist:css:init', ['dist:copy'], initCss);l
+// gulp.task('dist:css:transform', ['dist:css:init'], genCss);
+// gulp.task('dist:css', ['dist:css:transform'], function () {
+//     return gulp.src(['assets/css/**/*.less', 'assets/css/**/_**'], {
+//         cwd: path.app
+//     }).pipe(clean());
+// });
+// // gulp.task('dist:css', ['dist:copy'], genCss);
 
-gulp.task('dist:lintjs', ['dist:copy'], lintJs);
+// gulp.task('dist:lintjs', ['dist:copy'], lintJs);
 
-// compress app's js
-gulp.task('dist:appjs', ['dist:copy'], function () {
-    return doForEachApp(function (appName) {
-        return gulp.src(['solution/' + appName + '/app.js', 'solution/' + appName + '/**/*.js'], {
-                cwd: path.src
-            })
-            .pipe(concat('solution/' + appName + '/' + appName + '.js'))
-            .pipe(uglifySources ? uglify() : nop())
-            .pipe(gulp.dest('.', {
-                cwd: path.dist
-            }));
-    }, 'appJs', 'compressing js');
-});
+// // compress app's js
+// gulp.task('dist:appjs', ['dist:copy'], function () {
+//     return doForEachApp(function (appName) {
+//         return gulp.src(['solution/' + appName + '/app.js', 'solution/' + appName + '/**/*.js'], {
+//                 cwd: path.src
+//             })
+//             .pipe(concat('solution/' + appName + '/' + appName + '.js'))
+//             .pipe(uglifySources ? uglify() : nop())
+//             .pipe(gulp.dest('.', {
+//                 cwd: path.dist
+//             }));
+//     }, 'appJs', 'compressing js');
+// });
 
-gulp.task('dist:tpl', ['dist:copy'], compressAppTemplates);
+// gulp.task('dist:tpl', ['dist:copy'], compressAppTemplates);
 
-// compress vendor's js
-gulp.task('dist:vendors', ['dist:copy'], function () {
-    return gulp.src(bowerFiles({
-            paths: {
-                bowerJson: pathToBowerJson,
-                bowerDirectory: pathToVendors
-            }
-        }))
-        .pipe(gulpFilter(['*.js']))
-        .pipe(concat('vendors.js'))
-        .pipe(uglifySources ? uglify() : nop())
-        .pipe(gulp.dest('app', {
-            cwd: path.dist
-        }));
-});
+// // compress vendor's js
+// gulp.task('dist:vendors', ['dist:copy'], function () {
+//     return gulp.src(bowerFiles({
+//             paths: {
+//                 bowerJson: pathToBowerJson,
+//                 bowerDirectory: pathToVendors
+//             }
+//         }))
+//         .pipe(gulpFilter(['*.js']))
+//         .pipe(concat('vendors.js'))
+//         .pipe(uglifySources ? uglify() : nop())
+//         .pipe(gulp.dest('app', {
+//             cwd: path.dist
+//         }));
+// });
 
-// compress libs js
-gulp.task('dist:libs', ['dist:copy'], function () {
-    return gulp.src(['libs/**/*.js'], {
-            cwd: path.src
-        })
-        .pipe(concat('libs.js'))
-        .pipe(uglifySources ? uglify() : nop())
-        .pipe(gulp.dest('app', {
-            cwd: path.dist
-        }));
-});
+// // compress libs js
+// gulp.task('dist:libs', ['dist:copy'], function () {
+//     return gulp.src(['libs/**/*.js'], {
+//             cwd: path.src
+//         })
+//         .pipe(concat('libs.js'))
+//         .pipe(uglifySources ? uglify() : nop())
+//         .pipe(gulp.dest('app', {
+//             cwd: path.dist
+//         }));
+// });
 
-// create html file and inject combined js and css files
-gulp.task('dist:html', ['dist:appjs', 'dist:tpl', 'dist:vendors', 'dist:libs'], genHtml);
+// // create html file and inject combined js and css files
+// gulp.task('dist:html', ['dist:appjs', 'dist:tpl', 'dist:vendors', 'dist:libs'], genHtml);
 
-// organize files into specific folders
-gulp.task('dist:structure', ['dist:html', 'dist:css'], function () {
-    // move app js files
-    var vendorsJs = gulp.src(['solution/vendors.js'], {
-        cwd: path.dist
-    }).pipe(gulp.dest('app', {
-        cwd: path.distStatic
-    }));
-    var libsJs = gulp.src(['solution/libs.js'], {
-        cwd: path.dist
-    }).pipe(gulp.dest('app', {
-        cwd: path.distStatic
-    }));
+// // organize files into specific folders
+// gulp.task('dist:structure', ['dist:html', 'dist:css'], function () {
+//     // move app js files
+//     var vendorsJs = gulp.src(['solution/vendors.js'], {
+//         cwd: path.dist
+//     }).pipe(gulp.dest('app', {
+//         cwd: path.distStatic
+//     }));
+//     var libsJs = gulp.src(['solution/libs.js'], {
+//         cwd: path.dist
+//     }).pipe(gulp.dest('app', {
+//         cwd: path.distStatic
+//     }));
 
-    var appJs = doForEachApp(function (appName) {
-        return gulp.src(['solution/' + appName + '/' + appName + '.js'], {
-                cwd: path.dist
-            })
-            .pipe(gulp.dest(path.distStatic + 'solution/' + appName + '/'));
-    }, 'structure', 'moving template files');
+//     var appJs = doForEachApp(function (appName) {
+//         return gulp.src(['solution/' + appName + '/' + appName + '.js'], {
+//                 cwd: path.dist
+//             })
+//             .pipe(gulp.dest(path.distStatic + 'solution/' + appName + '/'));
+//     }, 'structure', 'moving template files');
 
-    var appTpl = doForEachApp(function (appName) {
-        return gulp.src(['solution/' + appName + '/**/*.html'], {
-                cwd: path.dist
-            })
-            .pipe(gulp.dest(path.distStatic + 'solution/' + appName + '/'));
-    }, 'structure', 'moving template files');
+//     var appTpl = doForEachApp(function (appName) {
+//         return gulp.src(['solution/' + appName + '/**/*.html'], {
+//                 cwd: path.dist
+//             })
+//             .pipe(gulp.dest(path.distStatic + 'solution/' + appName + '/'));
+//     }, 'structure', 'moving template files');
 
-    // move assets
-    var assets = gulp.src(['assets/**'], {
-            cwd: path.dist
-        })
-        .pipe(gulp.dest('assets', {
-            cwd: path.distStatic
-        }));
+//     // move assets
+//     var assets = gulp.src(['assets/**'], {
+//             cwd: path.dist
+//         })
+//         .pipe(gulp.dest('assets', {
+//             cwd: path.distStatic
+//         }));
 
-    // copy only necessary vendors' files
-    var vendors = gulp.src(['./vendors/**/*.css', './vendors/**/*.min.js', './vendors/**/fonts/**'], {
-            cwd: path.dist
-        })
-        .pipe(gulp.dest('vendors', {
-            cwd: path.distStatic
-        }));
+//     // copy only necessary vendors' files
+//     var vendors = gulp.src(['./vendors/**/*.css', './vendors/**/*.min.js', './vendors/**/fonts/**'], {
+//             cwd: path.dist
+//         })
+//         .pipe(gulp.dest('vendors', {
+//             cwd: path.distStatic
+//         }));
 
-    var libs = gulp.src(['./libs/**/*.css', './libs/**/*.min.js', './libs/**/fonts/**'], {
-            cwd: path.dist
-        })
-        .pipe(gulp.dest('libs', {
-            cwd: path.distStatic
-        }));
-
-
-    return merge(appJs, appTpl, vendorsJs, libsJs, assets, vendors, libs);
-});
-
-// create distro + cleanup unucessary files
-gulp.task('package', ['dist:structure'], function () {
-    // cleanup files
-    var topDistStatic = gulp.src(['./solution/', './assets/', './vendors/', './libs/', '*.tpl.html', '**/*.orig'], {
-        cwd: path.dist
-    }).pipe(clean());
-    var combinedStatic = gulp.src(['./assets/styles', './assets/css/**/*.map'], {
-        cwd: path.distStatic
-    }).pipe(clean());
-    return merge(topDistStatic, combinedStatic);
-});
-
-// create distro + cleanup unucessary files
-gulp.task('bower', function () {
-    var bwr = doForEachApp(function (appName) {
+//     var libs = gulp.src(['./libs/**/*.css', './libs/**/*.min.js', './libs/**/fonts/**'], {
+//             cwd: path.dist
+//         })
+//         .pipe(gulp.dest('libs', {
+//             cwd: path.distStatic
+//         }));
 
 
-    }, 'structure', 'moving template files');
+//     return merge(appJs, appTpl, vendorsJs, libsJs, assets, vendors, libs);
+// });
 
-    return bwr;
+// // create distro + cleanup unucessary files
+// gulp.task('package', ['dist:structure'], function () {
+//     // cleanup files
+//     var topDistStatic = gulp.src(['./solution/', './assets/', './vendors/', './libs/', '*.tpl.html', '**/*.orig'], {
+//         cwd: path.dist
+//     }).pipe(clean());
+//     var combinedStatic = gulp.src(['./assets/styles', './assets/css/**/*.map'], {
+//         cwd: path.distStatic
+//     }).pipe(clean());
+//     return merge(topDistStatic, combinedStatic);
+// });
 
-});
+// // create distro + cleanup unucessary files
+// gulp.task('bower', function () {
+//     var bwr = doForEachApp(function (appName) {
 
-/******* startup taks *******/
 
-// default task
-if (isBuild) {
-    gulp.task('default', ['package']);
-} else {
-    gulp.task('default', ['app:html'], watchLocalChanges);
-}
+//     }, 'structure', 'moving template files');
+
+//     return bwr;
+
+// });
+
+// /******* startup taks *******/
+
+// // default task
+// if (isBuild) {
+//     gulp.task('default', ['package']);
+// } else {
+//     gulp.task('default', ['app:html'], watchLocalChanges);
+// }
+
+
