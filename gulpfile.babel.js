@@ -1,38 +1,38 @@
-var gulp = require('gulp');
-var concat = require('gulp-concat');
-var plumber = require('gulp-plumber');
-var inject = require('gulp-inject');
-var fs = require('fs');
-var uglify = require('gulp-uglify');
-var bowerFiles = require('main-bower-files');
-var extend = require('node.extend');
-var rename = require("gulp-rename");
-var argv = require("yargs").argv;
-var gulpFilter = require('gulp-filter'); // ?
-var clean = require('gulp-clean');
-var jshint = require('gulp-jshint');
-var stylish = require('jshint-stylish');
-var merge = require('merge-stream');
-var templateCache = require('gulp-angular-templatecache');
-var preprocess = require('gulp-preprocess');
-var less = require('gulp-less');
-var minifyHTML = require('gulp-minify-html');
-var gutil = require('gulp-util');
-var minifyCss = require('gulp-minify-css');
-var nop = require('gulp-nop');
-var ngHtml2Js = require("gulp-ng-html2js");
-var inlineCss = require('gulp-inline-css');
-var bower = require('gulp-bower');
-var runSequence = require('run-sequence');
-var asyncPipe = require('gulp-async-func-runner');
-
+import gulp from 'gulp';
+import concat from 'gulp-concat';
+import plumber from 'gulp-plumber';
+import inject from 'gulp-inject';
+import fs from 'fs';
+import uglify from 'gulp-uglify';
+import bowerFiles from 'main-bower-files';
+import extend from 'node.extend';
+import rename from "gulp-rename";
+import yargs from "yargs";
+import gulpFilter from 'gulp-filter'; // ?
+import clean from 'gulp-clean';
+import jshint from 'gulp-jshint';
+import stylish from 'jshint-stylish';
+import merge from 'merge-stream';
+import templateCache from 'gulp-angular-templatecache';
+import preprocess from 'gulp-preprocess';
+import less from 'gulp-less';
+import minifyHTML from 'gulp-minify-html';
+import gutil from 'gulp-util';
+import minifyCss from 'gulp-minify-css';
+import nop from 'gulp-nop';
+import ngHtml2Js from "gulp-ng-html2js";
+import inlineCss from 'gulp-inline-css';
+import bower from 'gulp-bower';
+import runSequence from 'run-sequence';
+import asyncPipe from 'gulp-async-func-runner';
+import babel from 'gulp-babel';
 
 var
     // application's main config file
     config = require('./config.json'),
     // srcDir = 'src/',
     // distDir = 'dist/',
-    env = (argv.env || 'debug').toLowerCase(),
+    env = (yargs.argv.env || 'debug').toLowerCase(),
     uglifySources = !/debug|dev/.test(env),
     buildVersion = (new Date()).getTime(),
     apps = config.apps || [],
@@ -109,7 +109,8 @@ function doForEachApp(cb) {
     apps.forEach(function (appName) {
         logger('running the [' + appName + ']');
         var task = cb(appName);
-        if (task !== false) {
+        if (!!task) {
+            logger(appName, ' >>>> ', task);
             merged.add(task);
         }
     });
@@ -398,7 +399,7 @@ function Application (appName) {
     }
 
     this.buildDist = function () {
-        return runTasksAsync(p_clearDist, p_copyFiles, p_genCss);
+        return runTasksAsync(p_clearDist);
     }
 
     // source transformation
