@@ -7,7 +7,9 @@
     "validate": "npm ls"
   },
   "babel": {
-    "presets": ["es2015"]
+    "presets": [
+      "es2015"
+    ]
   },
   "devDependencies": {
     "babel-cli": "^6.7.7",

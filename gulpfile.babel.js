@@ -1,3 +1,5 @@
+'use strict';
+
 import gulp from 'gulp';
 import concat from 'gulp-concat';
 import plumber from 'gulp-plumber';
@@ -25,7 +27,6 @@ import inlineCss from 'gulp-inline-css';
 import bower from 'gulp-bower';
 import runSequence from 'run-sequence';
 import asyncPipe from 'gulp-async-func-runner';
-import babel from 'gulp-babel';
 
 var
     // application's main config file
@@ -82,13 +83,11 @@ logger('Available apps: ', apps);
 
 gulp.task('default', taskBuildAll);
 
-return;
-
 
 // default task
-if (isBuild) {
-    gulp.task('default', taskBuildAll);
-}
+// if (isBuild) {
+//     gulp.task('default', taskBuildAll);
+// }
 //} else {
 //     gulp.task('default', ['app:html'], watchLocalChanges);
 // }
