@@ -1,6 +1,7 @@
-'use strict';
+// 'use strict';
 
 import gulp from 'gulp';
+import babel from 'gulp-babel';
 import concat from 'gulp-concat';
 import plumber from 'gulp-plumber';
 import inject from 'gulp-inject';
@@ -14,19 +15,20 @@ import gulpFilter from 'gulp-filter'; // ?
 import clean from 'gulp-clean';
 import jshint from 'gulp-jshint';
 import stylish from 'jshint-stylish';
-import merge from 'merge-stream';
+// import merge from 'merge-stream';
 import templateCache from 'gulp-angular-templatecache';
 import preprocess from 'gulp-preprocess';
 import less from 'gulp-less';
 import minifyHTML from 'gulp-minify-html';
 import gutil from 'gulp-util';
-import minifyCss from 'gulp-minify-css';
+// import minifyCss from 'gulp-minify-css';
+import cleanCSS from 'gulp-clean-css';
 import nop from 'gulp-nop';
-import ngHtml2Js from "gulp-ng-html2js";
-import inlineCss from 'gulp-inline-css';
+// import ngHtml2Js from "gulp-ng-html2js";
+// import inlineCss from 'gulp-inline-css';
 import bower from 'gulp-bower';
-import runSequence from 'run-sequence';
-import asyncPipe from 'gulp-async-func-runner';
+// import runSequence from 'run-sequence';
+// import asyncPipe from 'gulp-async-func-runner';
 
 var
     // application's main config file
@@ -38,6 +40,7 @@ var
     buildVersion = (new Date()).getTime(),
     apps = config.apps || [],
     baseConfig = config.base;
+
 
 
 if (!baseConfig) {
@@ -60,12 +63,32 @@ if (apps.length === 0) {
 //     path.app = path.dist;
 // }
 
+// function p_clean () {
+//     return gulp.src('./dist', {allowEmpty: true})
+//         .pipe(clean()).on('end', function () { console.log('clean DONE'); });
+// }
+// function p_copy () {
+//     return gulp.src('./src').pipe(gulp.dest('./dist'))
+//         .on('end', () => { console.log('copying files to: Done!'); });
+// }
 
-function logger () {
-    gutil.log([].slice.call(arguments).join(' '));
+// var tasks = [p_clean, p_copy];
+// const build = gulp.series(tasks);
+// export default build;
+
+
+// gulp.task('default', build);
+
+function logger (...args) {
+    gutil.log(args.join(' '));
 }
 
-logger('Running env = ' + env);
+function handleError(err) {
+    logger(err.toString());
+    this.emit('end');
+}
+
+// logger('Running env = ' + env);
 // logger('[path] src = ' + path.src);
 // logger('[path] dist = ' + path.dist);
 // logger('[path] app = ' + path.app);
@@ -76,13 +99,10 @@ logger('Running env = ' + env);
 // logger('[path] pathToBowerJson = ' + pathToBowerJson);
 
 
-logger('Available apps: ', apps);
+// logger('Available apps: ', apps);
 
-
-
-
-gulp.task('default', taskBuildAll);
-
+// export default taskBuildAll;
+// taskBuildAll();
 
 // default task
 // if (isBuild) {
@@ -94,449 +114,358 @@ gulp.task('default', taskBuildAll);
 
 
 /******* startup taks *******/
-function taskBuildAll () {
-    return doForEachApp(function (appName) {
-        var app = new Application(appName);
-        app.configure(baseConfig, buildVersion, env);
-        return app.buildDist();
-    });
-}
-
-function doForEachApp(cb) {
-    var merged = merge();
-    // logger('[' + taskOwner + '] running through apps:');
-    apps.forEach(function (appName) {
-        logger('running the [' + appName + ']');
-        var task = cb(appName);
-        if (!!task) {
-            logger(appName, ' >>>> ', task);
-            merged.add(task);
-        }
-    });
-    return merged;
-}
 
 
-function Application (appName) {
-    applogger(appName, 'creating new instance');
-
-    var buildVersion = null,
-        env = null,
-        baseCfg = null,
-        srcRoot = './src/',
-        distRoot = './dist/',
-        staticName = 'static',
-        // dirSrcVendors = name + '/static/vendors/',
-        // dirLibs = 'libs/', 
-        pathToBowerJson = withinAppSrcDir('bower.json'),
-        pathToConfigJson = withinAppSrcDir('config.json'),
-        path = null,
-        // pathToVendors = path.app + dirVendors,
-        // pathToLibs = path.app + dirLibs,
-        appConfigGeneral = require(pathToConfigJson),
-        appConfig = null;
 
 
-    // this.getConfig = function () {
-    //     return {
-    //     }
-    // }
+var Application = (function() {
 
-    // function toF (f) {
-    //     return function () {
-    //         if (typeof f === 'function') {
-    //             return f();
-    //         }
-    //         return f;
-    //     }
-    // }
+    var privates = new WeakMap();
 
-    var tasks = {};
-    // key = task name
-    // value = function
+    const SRC_ROOT = './src/';
+    const DIST_ROOT ='./dist/';
+    const STATIC_DIR_NAME = 'static';
 
-    function getTaskFnByTaskName (taskName) {
-        return tasks[getTaskName(taskName)];
-    }
-
-    function setTaskFn (taskName, cb) {
-        var appTaskName = getTaskName(taskName);
-        tasks[appTaskName] = cb;
-        return appTaskName;
-    }
-
-    function isTaskSet (taskName) {
-        return !!getTaskFnByTaskName(taskName);
-    }
-
-    function getTaskName (taskName) {
-        return getAppName() + '_' + taskName;
-    }
-
-    function getFunctionTaskName (fn) {
-        return getAppName() + '_' + fn.name;
-    }
-
-    function registerAppTask (cb) {
-        applogger(cb.name);
-        var taskName = cb.name;
-        if (isTaskSet(taskName)) return true;
-        var gulpTaskName = setTaskFn(taskName, cb);
-        applogger('registered in gulp as ' + gulpTaskName);
-        gulp.task(gulpTaskName, cb);
-        return true;
-    }
-
-    function registerAppTasks () {
-        var tasks = [].slice.call(arguments, 0);
-        for (var i = tasks.length - 1; i >= 0; i--) {
-            if (typeof tasks[i] === 'function') {
-                registerAppTask(tasks[i]);
-            } else {
-                applogger('wrong argument occured! typeof = ' + typeof tasks[i]);
+    function combinePath (...chunks) {
+        chunks.forEach((v, k) => {
+            if (typeof v === 'function') {
+                chunks[k] = v.call(this);
             }
-        }
+        });
+        return chunks.join('/').replace(/\/\//g, '/');
     }
 
-    function runTasksAsync (/* function pointers */) {
-        var tasks = [].slice.call(arguments, 0), // array of function pointers
-            gulpTasksNames = [].map.call(tasks, getFunctionTaskName); // array of scoped app task names
+    class _Application {
+        constructor ({name: appName, baseCfg: baseConfig, ver: ver, env: env}) {
+            
+            privates.set(this, {
+                name: appName,
+                ver: ver,
+                env: env,
+                cfg: null,
+                paths: null,
+                urls: null
+            });
 
-        // registering missed tasks
-        registerAppTasks.apply(null, tasks);
+            // console.log(privates.get(this));
 
-        applogger.apply(null, gulpTasksNames);
-        return runSequence.apply(null, gulpTasksNames);
-        // }
-        // if (tasks.length === 1) {
-        // if (tasks.length > 1) {
-        //     return runSequence(, gulpTasksNames, gulpTasksNames.pop());
-        // }
-        // return nop();
-    }
+            this.applogger('initializing');
 
-    function getStaticName () {
-        if (isBuild()) {
-            return staticName + '_' + getBuildVer();
-        }
-        return staticName;
-    }
+            var pathToBowerJson = this.getPathToFileInAppDir('bower.json'),
+                appConfigGeneral = require(this.getPathToFileInAppDir('config.json')),
+                appConfigGeneralCurrEnv = appConfigGeneral[this.env],
+                paths = {},
+                urls = {},
+                cfg = {};
 
-    function combinePath () {
-        var parts = [].slice.call(arguments, 0);
-        for (var k in parts) {
-            if (typeof parts[k] === 'function') {
-                parts[k] = parts[k]();
-            }
-        }
-        return parts.join('/').replace(/\/\//g, '/');
-    }
-
-    function isBuild () {
-        return getEnv() !== 'debug';
-    }
-
-    function uglifySources () {
-        return !/debug|dev/.test(env);
-    }
-
-    function setRuntimePathAppToDist () {
-        if (path.run) throw 'Runtime path is set';
-        path.run = path.dist;
-    }
-
-    function setRuntimePathAppToSrc () {
-        if (path.run) throw 'Runtime path is set';
-        path.run = path.src;
-    }
-
-    function getBuildVersionUrlParam () {
-        return '?bust=' + getBuildVer();
-    }
-
-    function withinAppSrcDir (p) {
-        return srcRoot + getAppName() + '/' + (!!p ? p : '');
-    }
-
-    function withinAppDistDir (p) {
-        return distRoot + getAppName() + '/' + (!!p ? p : '');
-    }
-
-    // function getStaticPath () {
-    //     return '/static/';
-    // }
-
-    function setAppConfig (c) {
-        appConfig = c || {};
-    }
-
-    function applogger () {
-        logger('    [' + getAppName() + '] fn [' + arguments.callee.caller.name + '] ', [].slice.call(arguments).join(' '));
-    }
-
-    function getAppName () {
-        return appName;
-    }
-
-    function setBuildVer (v) {
-        applogger('build #', v);
-        buildVersion = v;
-        // that.configure(that.getBaseConfig());
-    }
-    function getBuildVer () {
-        return buildVersion;
-    }
-
-    function setEnv (e) {
-        env = !!e ? e.toLowerCase() : 'debug';
-        applogger('env ', env);
-        // that.configure(that.getBaseConfig());
-    }
-
-    function getEnv () {
-        return env;
-    }
-
-    function setBuildMode (ver, env) {
-        setBuildVer(ver);
-        setEnv(env);
-    }
-
-    function setBaseConfig (base) {
-        baseCfg = base || {};
-        // that.configure(that.getBaseConfig());
-    }
-
-    function getBaseConfig () {
-        return baseCfg || {};
-    }
-
-    this.configure = function (baseConfig, ver, env) {
-        if (getEnv()) throw 'App is already configured';
-        setBaseConfig(baseConfig);
-        setBuildMode(ver, env);
-        var appCurrEnvCfg = appConfigGeneral[getEnv()],
-            common = {};
-        if (appConfigGeneral.common) {
-            common = appConfigGeneral.common;
-        }
-        setAppConfig(extend(true, getBaseConfig(), common, appCurrEnvCfg));
-        path = {
-            src: {
-                app: withinAppSrcDir(),
-                static: withinAppSrcDir(getStaticName),
-                assets: combinePath(withinAppSrcDir, getStaticName, 'assets'),
-                vendors: combinePath(withinAppSrcDir, getStaticName, 'vendors'),
-                urlStatic: combinePath('', getStaticName, '')
-            },
-            dist: {
-                app: withinAppDistDir(),
-                static: combinePath(withinAppDistDir, getStaticName),
-                assets: combinePath(withinAppDistDir, getStaticName, 'assets'),
-                vendors: combinePath(withinAppDistDir, getStaticName, 'vendors'),
-                urlStatic: combinePath('', getStaticName, '')
-            }
-            // app: 'src/' + name + '/',
-            // dist: 'dist/' + name + '/',
-            // srcApp: 'src/' + name + '/',
-            // distApp: 'dist/' + name + '/',
-
-            // // static path
-            // innerSrcStatic: '/static/',
-            // innerDistStatic: '/static/' + buildVersion + '/',
-
-            // // urls
-            // srcStaticUrl: '/static/',
-            // distStaticUrl: '/static/' + buildVersion + '/'
-            // distStatic: 'dist/' + (isBuild ? 'static/' + buildVersion + '/' : '')
-        };
-        if (isBuild()) {
-            setRuntimePathAppToDist();
-        } else {
-            setRuntimePathAppToSrc();
-        }
-        return getAppConfig();
-    }
-
-    function getAppConfig () {
-        return appConfig || {};
-    }
-
-    function getTplConfigObj () {
-        var appConfig = getAppConfig();
-        appConfig.VERSION = buildVersion;
-        appConfig.DEBUG = !isBuild();
-        appConfig.ENV = env;
-        appConfig.STATICDIR = path.app.static;
-        // adding both local and common values
-        // if (configLocal[appName]) {
-        //     appConfig = extend(true, config.common, appConfig, configLocal[appName]);
-        // } else {
-        //     appConfig = extend(true, config.common, appConfig);
-        // }
-        var appvars = {
-            CONFIG: JSON.stringify(appConfig),
-            CONFIGJSON: appConfig,
-            STATICDIR: getStaticPath(),
-            VERSION: getBuildVer(),
-            BUST: getBuildVersionUrlParam(),
-            APP: getAppName()
-        };
-        return appvars;
-    }
-
-    this.p_InstallBowerDeps = function () {
-        return bower(path.src.vendors)
-            .pipe(gulp.dest(path.src.apps));
-    }
-
-    this.hasEnvConfig = function (env) {
-        if (env) {
-            return config && config.apps && config.apps[name] && config.apps[name][env];
-        }
-        return config && config.apps && config.apps[name];
-    }
-
-    this.buildDist = function () {
-        return runTasksAsync(p_clearDist);
-    }
-
-    // source transformation
-
-    function p_clearDist () {
-        applogger('cleaning ' + path.dist.app);
-        return gulp.src(path.dist.app).pipe(clean())
-            .on('end', function(){ applogger('cleaning: Done!'); });
-    }
-
-    function p_copyFiles () {
-        applogger('copying files to ' + path.dist.app);
-        return gulp.src(['**/*', '!assets/{css,css/**}'], {
-                cwd: path.src.app
-            }).pipe(gulp.dest(path.dist.app))
-            .on('end', function(){ applogger('copying files to: Done!'); });
-    }
-
-    function p_genCss () {
-        applogger('generating css');
-        var seriesTasks = merge();
-        var clean = gulp.src(path.run.assets + 'css/').pipe(clean());
-        var gen = gulp.src('*.less', {
-                cwd: path.run.assets + 'css/'
-            })
-            .pipe(plumber({
-                errorHandler: handleError
-            }))
-            .pipe(less({
-                paths: [path.run.assets]
-            }))
-            .pipe(uglifySources() ? minifyCss({
-                processImport: false
-            }) : nop())
-            .pipe(gulp.dest('.', {
-                cwd: path.run.assets + 'css/'
-            }));
-        seriesTasks.add(clean);
-        seriesTasks.add(gen);
-        return seriesTasks.on('end', function(){ applogger('generating css: Done!'); });
-    }
-
-    function p_cleanNonCss () {
-        return gulp.src(['assets/css/**/*.less', 'assets/css/**/_**'], {
-            cwd: path.app
-        }).pipe(clean());
-    }
-
-
-    // registerAppTask('app:css', [cleanCss, initCss, genCss, p_cleanNonCss]);
-
-// function cleanCss() {
-//     logger('[cleanCss]');
-//     return gulp.src(path.app + 'assets/css/').pipe(clean());
-// }
-
-// // TODO: merge into one task and run them in sync
-// // compiles scss files into css
-// gulp.task('app:css:clean', cleanCss);
-// gulp.task('app:css:init', ['app:css:clean'], initCss);
-// gulp.task('app:css:transform', ['app:css:init'], genCss);
-// gulp.task('app:css', ['app:css:transform'], function () {
-//     return gulp.src(['assets/css/**/*.less', 'assets/css/**/_**'], {
-//         cwd: path.app
-//     }).pipe(clean());
-// });
-
-    function p_transformTemplate () {
-        return gulp.src('index.tpl.html', {
-                cwd: path.src.app
-            })
-            .pipe(injectAppVars(appName))
-            .pipe(injectAppScripts(appName))
-            .pipe(injectAppScripts('shared'))
-            .pipe(injectVendors())
-            .pipe(injectLibs())
-            .pipe(rename(appName + '.html'))
-            .pipe(gulp.dest(path.app));
-    }
-
-    function p_transformLess () {
-
-    }
-
-    function p_compressAppJs () {
-
-    }
-
-    function p_compressVendorsJs () {
-
-    }
-
-    function p_compressLibJs () {
-
-    }
-
-    function p_injectVars () {
-        
-    }
-
-    function p_injectStatic () {
-
-    }
-
-    function p_injectVendors () {
-        applogger('        [injectVendorScripts]');
-        var jsVendorsFiles = [];
-        if (isBuild()) {
-            jsVendorsFiles = ['app/vendors.js'];
-        } else {
-            jsVendorsFiles = bowerFiles({
-                filter: /.*\.js$/,
-                paths: {
-                    bowerJson: pathToBowerJson,
-                    bowerDirectory: pathToVendors
+            cfg = extend(true, baseConfig, appConfigGeneral.common || {}, appConfigGeneralCurrEnv)
+            paths = {
+                src: {
+                    app: this.getPathToFileInAppDir(),
+                    static: this.getPathToFileInAppDir(this.staticDirName),
+                    assets: this.combinePath(this.getPathToFileInAppDir, this.staticDirName, 'assets'),
+                    vendors: this.combinePath(this.getPathToFileInAppDir, this.staticDirName, 'vendors')
+                },
+                dist: {
+                    app: this.getPathToFileInDistAppDir(),
+                    static: this.combinePath(this.getPathToFileInDistAppDir, this.staticDirName),
+                    assets: this.combinePath(this.getPathToFileInDistAppDir, this.staticDirName, 'assets'),
+                    vendors: this.combinePath(this.getPathToFileInDistAppDir, this.staticDirName, 'vendors')
                 }
+            };
+            paths.run = this.isBuild ? paths.dist : paths.src;
+            urls = {
+                static: this.combinePath('', this.staticDirName, '')
+            };
+
+            privates.get(this).cfg = cfg;
+            privates.get(this).paths = paths;
+            privates.get(this).urls = urls;
+        }
+
+        get staticDirName () { return this.isBuild ? `${STATIC_DIR_NAME}_${this.ver}` : STATIC_DIR_NAME; }
+        get name () { return privates.get(this).name; }
+        get ver () { return privates.get(this).ver; }
+        get env () { return privates.get(this).env; }
+        get bust () { return `?bust=${this.ver}`; }
+        get canUglify () { return !/debug|dev/.test(this.ver); }
+        get isBuild () { return this.env !== 'debug'; }
+        get config () { return privates.get(this).cfg; }
+        get paths () { return privates.get(this).paths; }
+        get urls () { return privates.get(this).urls; }
+        get tplConfig () {
+            // var appConfig = this.getAppConfig();
+            // appConfig.VERSION = buildVersion;
+            // appConfig.DEBUG = !this.isBuild();
+            // appConfig.ENV = env;
+            // appConfig.STATICDIR = path.app.static;
+            // adding both local and common values
+            // if (configLocal[appName]) {
+            //     appConfig = extend(true, config.common, appConfig, configLocal[appName]);
+            // } else {
+            //     appConfig = extend(true, config.common, appConfig);
+            // }
+            var appvars = {
+                DEBUG: !this.isBuild,
+                ENV: this.env,
+                CONFIG: JSON.stringify(this.config),
+                CONFIGJSON: this.config,
+                STATICDIR: this.urls.static,
+                VERSION: this.ver,
+                BUST: this.bust,
+                APP: this.name
+            };
+            return appvars;
+        }
+
+
+
+        combinePath (...p) {
+            return combinePath.bind(this)(...p);
+        }
+
+        getPathToFileInAppDir (p) {
+            return  `${SRC_ROOT}${this.name}/${!!p ? p : ''}`;
+        }
+
+        getPathToFileInDistAppDir (p) {
+            return  `${DIST_ROOT}${this.name}/${!!p ? p : ''}`;
+        }
+
+        applogger (...params) {
+            logger(`    [${this.name}] ${params.join(' ')}`);
+        }
+
+        appFnLogger (fn, ...params) {
+            logger(`        [${this.name}.${fn}] ${params.join(' ')}`);
+        }
+
+        // hasEnvConfig (env) {
+        //     if (env) {
+        //         return config && config.apps && config.apps[name] && config.apps[name][env];
+        //     }
+        //     return config && config.apps && config.apps[name];
+        // }
+
+        //-------- TASKS
+
+
+        t_buildDist () {
+            this.appFnLogger('t_buildDist', 'starting');
+            return [this.p_clearDist.bind(this), this.p_copyFiles.bind(this), ...this.p_genCss.bind(this)(),
+                gulp.parallel(this.p_clearDist2.bind(this), this.p_clearDist3.bind(this))];
+        }
+
+        //--------- FILE MODIFIERS
+
+        p_clearDist2 () {
+            this.appFnLogger('p_clearDist', 'cleaning ' + this.paths.dist.app);
+            return gulp.src(this.paths.dist.app+'_2', {allowEmpty: true})
+                .pipe(clean())
+                .on('end', () => this.appFnLogger('p_clearDist2', 'done'));
+        }
+        p_clearDist3 () {
+            this.appFnLogger('p_clearDist', 'cleaning ' + this.paths.dist.app);
+            return gulp.src(this.paths.dist.app+'_3', {allowEmpty: true})
+                .pipe(clean())
+                .on('end', () => this.appFnLogger('p_clearDist3', 'done'));
+        }
+
+        p_InstallBowerDeps () {
+            this.appFnLogger('p_InstallBowerDeps');
+            return bower(this.paths.src.vendors)
+                .pipe(gulp.dest(this.paths.src.apps))
+                .on('end', () => this.appFnLogger('p_InstallBowerDeps', 'done'));
+        }
+
+        p_clearDist () {
+            this.appFnLogger('p_clearDist', 'cleaning ' + this.paths.dist.app);
+            return gulp.src(this.paths.dist.app, {allowEmpty: true})
+                .pipe(clean())
+                .on('end', () => this.appFnLogger('p_clearDist', 'done'));
+        }
+
+        p_copyFiles () {
+            this.appFnLogger('p_copyFiles', 'copying files to ' + this.paths.dist.app);
+            return gulp.
+                src(['**/*', '!assets/{css,css/**}'], {
+                    cwd: this.paths.src.app
+                })
+                .pipe(gulp.dest(this.paths.dist.app))
+                .on('end', () => this.appFnLogger('p_copyFiles', 'done'));
+                // .on('start', () => { this.applogger('starting copying files'); })
+                // .on('end', () => { this.applogger('copying files to: Done!'); });
+        }
+
+        p_genCss () {
+            this.appFnLogger('p_genCss', 'generating css');
+            // var seriesTasks = [];
+            var canUglify = this.canUglify;
+            var _cleanCssDir = () => {
+                gulp.src(this.paths.run.assets + 'css/')
+                .pipe(clean())
+                .on('end', () => this.appFnLogger('_cleanCssDir', 'done'))
+            };
+            var _genCss = () => {
+                gulp.src('*.less', {
+                    cwd: this.paths.run.assets + 'css/'
+                })
+                .pipe(plumber({
+                    errorHandler: handleError
+                }))
+                .pipe(less({
+                    paths: [this.paths.run.assets]
+                }))
+                .pipe(canUglify ? cleanCSS({
+                    processImport: false
+                }) : nop())
+                .pipe(gulp.dest('.', {
+                    cwd: this.paths.run.assets + 'css/'
+                }))
+                .on('end', () => this.appFnLogger('_genCss', 'done'))
+            };
+            return [_cleanCssDir, _genCss];
+            // seriesTasks.push(clean);
+            // seriesTasks.push(gen);
+            // return seriesTasks.on('end', () => { this.applogger('generating css: Done!'); });
+        }
+
+        p_cleanNonCss () {
+            return gulp.src(['assets/css/**/*.less', 'assets/css/**/_**'], {
+                cwd: this.paths.run.app
+            }).pipe(clean());
+        }
+
+
+        // registerAppTask('app:css', [cleanCss, initCss, genCss, p_cleanNonCss]);
+
+        // cleanCss() {
+        //     logger('[cleanCss]');
+        //     return gulp.src(path.app + 'assets/css/').pipe(clean());
+        // }
+
+        // // TODO: merge into one task and run them in sync
+        // // compiles scss files into css
+        // gulp.task('app:css:clean', cleanCss);
+        // gulp.task('app:css:init', ['app:css:clean'], initCss);
+        // gulp.task('app:css:transform', ['app:css:init'], genCss);
+        // gulp.task('app:css', ['app:css:transform'], () => {
+        //     return gulp.src(['assets/css/**/*.less', 'assets/css/**/_**'], {
+        //         cwd: path.app
+        //     }).pipe(clean());
+        // });
+
+        p_transformTemplate () {
+            return gulp.src('index.tpl.html', {
+                    cwd: path.src.app
+                })
+                .pipe(injectAppVars(appName))
+                .pipe(injectAppScripts(appName))
+                .pipe(injectAppScripts('shared'))
+                .pipe(injectVendors())
+                .pipe(injectLibs())
+                .pipe(rename(appName + '.html'))
+                .pipe(gulp.dest(path.app));
+        }
+
+        p_transformLess () {
+
+        }
+
+        p_compressAppJs () {
+
+        }
+
+        p_compressVendorsJs () {
+
+        }
+
+        p_compressLibJs () {
+
+        }
+
+        p_injectVars () {
+            
+        }
+
+        p_injectStatic () {
+
+        }
+
+        p_injectVendors () {
+            this.applogger('        [injectVendorScripts]');
+            var jsVendorsFiles = [];
+            if (isBuild()) {
+                jsVendorsFiles = ['app/vendors.js'];
+            } else {
+                jsVendorsFiles = bowerFiles({
+                    filter: /.*\.js$/,
+                    paths: {
+                        bowerJson: pathToBowerJson,
+                        bowerDirectory: pathToVendors
+                    }
+                });
+            }
+            // console.dir(jsVendorsFiles);
+            return inject(gulp.src(jsVendorsFiles, {
+                cwd: path.app
+            }), {
+                relative: true,
+                transform: transform,
+                name: 'bower'
             });
         }
-        // console.dir(jsVendorsFiles);
-        return inject(gulp.src(jsVendorsFiles, {
-            cwd: path.app
-        }), {
-            relative: true,
-            transform: transform,
-            name: 'bower'
-        });
-    }
 
-    function p_cleanup () {
+        p_cleanup () {
+
+        }
+
+        p_createPackage () {
+
+        }
 
     }
 
-    function p_createPackage () {
+    return _Application;
+})();
 
-    }
+function doForEachApp(cb) {
+    // var series = [];
+    // var parallel = [];
+    var series = [];
+    // logger('[' + taskOwner + '] running through apps:');
+    apps.forEach((appName) => {
+        // logger('running the [' + appName + ']');
+        // var task = cb(appName);
+        // logger(appName, ' task= ', task);
+        // if (!!task) {
+            // logger(appName, ' >>>> ', task);
+            var tasks = cb(appName);
+            series.push(...tasks);
+            // tasks.series;
+            // tasks.parallel;
+            // apps.unshift([gulp.series(tasks.series), gulp.parallel(tasks.parallel)]);
 
+        // }
+    });
+    // logger('total tasks to run: ', series.length);
+    // logger(series);
+    return gulp.series(...series);
 }
 
+function taskBuildAll () {
+    return doForEachApp((appName) => {
+        var app = new Application({
+            name: appName,
+            baseCfg: baseConfig,
+            ver: buildVersion,
+            env: env
+        });
+        return app.t_buildDist();
+    });
+}
+
+gulp.task('default', taskBuildAll());
 
 
 
