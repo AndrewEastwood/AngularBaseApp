@@ -1,4 +1,7 @@
 {
+    "common": {
+        "staticPath": "/static/"
+    },
     "debug": {
         "cookieHost": "localhost",
         "hostname": "http://localhost/",

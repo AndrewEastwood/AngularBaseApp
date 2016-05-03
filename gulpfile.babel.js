@@ -27,19 +27,19 @@ import nop from 'gulp-nop';
 // import ngHtml2Js from "gulp-ng-html2js";
 // import inlineCss from 'gulp-inline-css';
 import bower from 'gulp-bower';
+import debug from 'gulp-debug';
 // import runSequence from 'run-sequence';
 // import asyncPipe from 'gulp-async-func-runner';
 
 var
     // application's main config file
-    config = require('./config.json'),
+    baseConfig = require('./config.json'),
     // srcDir = 'src/',
     // distDir = 'dist/',
     env = (yargs.argv.env || 'debug').toLowerCase(),
     uglifySources = !/debug|dev/.test(env),
     buildVersion = (new Date()).getTime(),
-    apps = config.apps || [],
-    baseConfig = config.base;
+    apps = baseConfig.apps || [];
 
 
 
@@ -58,7 +58,7 @@ if (apps.length === 0) {
 // }
 
 // set new app path in case of build mode
-// if (isBuild) {
+// if (isDeloyment) {
 //     logger('OMG! It\'s production build');
 //     path.app = path.dist;
 // }
@@ -105,7 +105,7 @@ function handleError(err) {
 // taskBuildAll();
 
 // default task
-// if (isBuild) {
+// if (isDeloyment) {
 //     gulp.task('default', taskBuildAll);
 // }
 //} else {
@@ -158,24 +158,28 @@ var Application = (function() {
                 urls = {},
                 cfg = {};
 
-            cfg = extend(true, baseConfig, appConfigGeneral.common || {}, appConfigGeneralCurrEnv)
+            cfg = extend(true, baseConfig.base, baseConfig.common,
+                appConfigGeneral.common || {}, appConfigGeneralCurrEnv)
             paths = {
                 src: {
                     app: this.getPathToFileInAppDir(),
-                    static: this.getPathToFileInAppDir(this.staticDirName),
-                    assets: this.combinePath(this.getPathToFileInAppDir, this.staticDirName, 'assets'),
-                    vendors: this.combinePath(this.getPathToFileInAppDir, this.staticDirName, 'vendors')
+                    assets: this.combinePathDir(this.getPathToFileInAppDir, 'assets'),
+                    assetsCss: this.combinePathDir(this.getPathToFileInAppDir, 'assets', 'css'),
+                    assetsStyles: this.combinePathDir(this.getPathToFileInAppDir, 'assets', 'styles'),
+                    vendors: this.combinePathDir(this.getPathToFileInAppDir, 'vendors')
                 },
                 dist: {
                     app: this.getPathToFileInDistAppDir(),
-                    static: this.combinePath(this.getPathToFileInDistAppDir, this.staticDirName),
-                    assets: this.combinePath(this.getPathToFileInDistAppDir, this.staticDirName, 'assets'),
-                    vendors: this.combinePath(this.getPathToFileInDistAppDir, this.staticDirName, 'vendors')
+                    assets: this.combinePathDir(this.getPathToFileInDistAppDir, 'assets'),
+                    assetsCss: this.combinePathDir(this.getPathToFileInDistAppDir, 'assets', 'css'),
+                    assetsStyles: this.combinePathDir(this.getPathToFileInDistAppDir, 'assets', 'styles'),
+                    vendors: this.combinePathDir(this.getPathToFileInDistAppDir, 'vendors')
                 }
             };
-            paths.run = this.isBuild ? paths.dist : paths.src;
+            paths.run = this.isDeloyment ? paths.dist : paths.src;
             urls = {
-                static: this.combinePath('', this.staticDirName, '')
+                static: this.isDeloyment ? this.combinePathDir(cfg.staticPath, this.distName) : 
+                    this.combinePathDir(cfg.staticPath, this.name)
             };
 
             privates.get(this).cfg = cfg;
@@ -183,20 +187,21 @@ var Application = (function() {
             privates.get(this).urls = urls;
         }
 
-        get staticDirName () { return this.isBuild ? `${STATIC_DIR_NAME}_${this.ver}` : STATIC_DIR_NAME; }
+        // get staticDirName () { return this.isDeloyment ? `${STATIC_DIR_NAME}_${this.ver}` : STATIC_DIR_NAME; }
         get name () { return privates.get(this).name; }
+        get distName () { return privates.get(this).name + '_' + this.ver; }
         get ver () { return privates.get(this).ver; }
         get env () { return privates.get(this).env; }
         get bust () { return `?bust=${this.ver}`; }
         get canUglify () { return !/debug|dev/.test(this.ver); }
-        get isBuild () { return this.env !== 'debug'; }
+        get isDeloyment () { return this.env !== 'debug'; }
         get config () { return privates.get(this).cfg; }
         get paths () { return privates.get(this).paths; }
         get urls () { return privates.get(this).urls; }
-        get tplConfig () {
+        get injectables () {
             // var appConfig = this.getAppConfig();
             // appConfig.VERSION = buildVersion;
-            // appConfig.DEBUG = !this.isBuild();
+            // appConfig.DEBUG = !this.isDeloyment();
             // appConfig.ENV = env;
             // appConfig.STATICDIR = path.app.static;
             // adding both local and common values
@@ -206,7 +211,7 @@ var Application = (function() {
             //     appConfig = extend(true, config.common, appConfig);
             // }
             var appvars = {
-                DEBUG: !this.isBuild,
+                DEBUG: !this.isDeloyment,
                 ENV: this.env,
                 CONFIG: JSON.stringify(this.config),
                 CONFIGJSON: this.config,
@@ -215,6 +220,7 @@ var Application = (function() {
                 BUST: this.bust,
                 APP: this.name
             };
+            console.log('appvars', appvars);
             return appvars;
         }
 
@@ -224,12 +230,17 @@ var Application = (function() {
             return combinePath.bind(this)(...p);
         }
 
+        combinePathDir (...p) {
+            p.push('');
+            return combinePath.bind(this)(...p);
+        }
+
         getPathToFileInAppDir (p) {
             return  `${SRC_ROOT}${this.name}/${!!p ? p : ''}`;
         }
 
         getPathToFileInDistAppDir (p) {
-            return  `${DIST_ROOT}${this.name}/${!!p ? p : ''}`;
+            return  `${DIST_ROOT}${this.distName}/${!!p ? p : ''}`;
         }
 
         applogger (...params) {
@@ -249,33 +260,49 @@ var Application = (function() {
 
         //-------- TASKS
 
+        t_build () {
+            if (this.isDeloyment) {
+                return this.t_buildDist();
+            }
+            // this.appFnLogger('t_build', 'starting');
+            return [
+                this.p_InstallBowerDeps.bind(this),
+                ...this.p_genCss.bind(this)()
+            ];
+        }
 
         t_buildDist () {
-            this.appFnLogger('t_buildDist', 'starting');
-            return [this.p_clearDist.bind(this), this.p_copyFiles.bind(this), ...this.p_genCss.bind(this)(),
-                gulp.parallel(this.p_clearDist2.bind(this), this.p_clearDist3.bind(this))];
+            // this.appFnLogger('t_buildDist', 'starting');
+            return [
+                this.p_InstallBowerDeps.bind(this),
+                this.p_clearDist.bind(this),
+                this.p_copyFiles.bind(this),
+                ...this.p_genCss.bind(this)(),
+                gulp.parallel(this.p_clearDist2.bind(this),
+                    this.p_clearDist3.bind(this))
+            ];
         }
 
         //--------- FILE MODIFIERS
 
         p_clearDist2 () {
-            this.appFnLogger('p_clearDist', 'cleaning ' + this.paths.dist.app);
+            // this.appFnLogger('p_clearDist', 'cleaning ' + this.paths.dist.app);
             return gulp.src(this.paths.dist.app+'_2', {allowEmpty: true})
                 .pipe(clean())
                 .on('end', () => this.appFnLogger('p_clearDist2', 'done'));
         }
+
         p_clearDist3 () {
-            this.appFnLogger('p_clearDist', 'cleaning ' + this.paths.dist.app);
+            // this.appFnLogger('p_clearDist', 'cleaning ' + this.paths.dist.app);
             return gulp.src(this.paths.dist.app+'_3', {allowEmpty: true})
                 .pipe(clean())
                 .on('end', () => this.appFnLogger('p_clearDist3', 'done'));
         }
 
         p_InstallBowerDeps () {
-            this.appFnLogger('p_InstallBowerDeps');
-            return bower(this.paths.src.vendors)
-                .pipe(gulp.dest(this.paths.src.apps))
-                .on('end', () => this.appFnLogger('p_InstallBowerDeps', 'done'));
+            // this.appFnLogger('p_InstallBowerDeps');
+            return bower({cwd: this.paths.run.app})
+                .pipe(gulp.dest(this.paths.run.vendors));
         }
 
         p_clearDist () {
@@ -292,68 +319,53 @@ var Application = (function() {
                     cwd: this.paths.src.app
                 })
                 .pipe(gulp.dest(this.paths.dist.app))
-                .on('end', () => this.appFnLogger('p_copyFiles', 'done'));
-                // .on('start', () => { this.applogger('starting copying files'); })
-                // .on('end', () => { this.applogger('copying files to: Done!'); });
+                // .on('end', () => this.appFnLogger('p_copyFiles', 'done'));
         }
 
         p_genCss () {
-            this.appFnLogger('p_genCss', 'generating css');
-            // var seriesTasks = [];
             var canUglify = this.canUglify;
-            var _cleanCssDir = () => {
-                gulp.src(this.paths.run.assets + 'css/')
-                .pipe(clean())
-                .on('end', () => this.appFnLogger('_cleanCssDir', 'done'))
+            var _cssRemoveDir = () => {
+                return gulp.src(this.paths.run.assetsCss, {allowEmpty: true})
+                    .pipe(clean())
+                    // .on('end', () => this.appFnLogger('_cssRemoveDir', 'done'))
             };
-            var _genCss = () => {
-                gulp.src('*.less', {
-                    cwd: this.paths.run.assets + 'css/'
-                })
-                .pipe(plumber({
-                    errorHandler: handleError
-                }))
-                .pipe(less({
-                    paths: [this.paths.run.assets]
-                }))
-                .pipe(canUglify ? cleanCSS({
-                    processImport: false
-                }) : nop())
-                .pipe(gulp.dest('.', {
-                    cwd: this.paths.run.assets + 'css/'
-                }))
-                .on('end', () => this.appFnLogger('_genCss', 'done'))
+            var _cssCopyAllStylesIntoCssDir = () => {
+                return gulp.src(['*', '**', '**/*'], {
+                        cwd: this.paths.run.assetsStyles
+                    })
+                    .pipe(preprocess({
+                        context: this.injectables
+                    }))
+                    .pipe(gulp.dest('.', {
+                        cwd: this.paths.run.assetsCss
+                    }));
             };
-            return [_cleanCssDir, _genCss];
-            // seriesTasks.push(clean);
-            // seriesTasks.push(gen);
-            // return seriesTasks.on('end', () => { this.applogger('generating css: Done!'); });
+            var _cssGenerate = () => {
+                return gulp.src(['*.less', '**/*.less'], {
+                        cwd: this.paths.run.assetsCss
+                    })
+                    .pipe(debug())
+                    .pipe(plumber({
+                        errorHandler: handleError
+                    }))
+                    .pipe(less({
+                        paths: [this.paths.run.assetsCss + '/*']
+                    }))
+                    .pipe(canUglify ? cleanCSS({
+                        processImport: false
+                    }) : nop())
+                    .pipe(gulp.dest('.', {
+                        cwd: this.paths.run.assetsCss
+                    }))
+                    // .on('end', () => this.appFnLogger('_cssGenerate', 'done'))
+            };
+            var _cssRemoveNonCssFiles = () => {
+                return gulp.src(['*.less', '**/*.less', '_**'], {
+                        cwd: this.paths.run.assetsCss
+                    }).pipe(clean());
+            };
+            return [_cssRemoveDir, _cssCopyAllStylesIntoCssDir, _cssGenerate, _cssRemoveNonCssFiles];
         }
-
-        p_cleanNonCss () {
-            return gulp.src(['assets/css/**/*.less', 'assets/css/**/_**'], {
-                cwd: this.paths.run.app
-            }).pipe(clean());
-        }
-
-
-        // registerAppTask('app:css', [cleanCss, initCss, genCss, p_cleanNonCss]);
-
-        // cleanCss() {
-        //     logger('[cleanCss]');
-        //     return gulp.src(path.app + 'assets/css/').pipe(clean());
-        // }
-
-        // // TODO: merge into one task and run them in sync
-        // // compiles scss files into css
-        // gulp.task('app:css:clean', cleanCss);
-        // gulp.task('app:css:init', ['app:css:clean'], initCss);
-        // gulp.task('app:css:transform', ['app:css:init'], genCss);
-        // gulp.task('app:css', ['app:css:transform'], () => {
-        //     return gulp.src(['assets/css/**/*.less', 'assets/css/**/_**'], {
-        //         cwd: path.app
-        //     }).pipe(clean());
-        // });
 
         p_transformTemplate () {
             return gulp.src('index.tpl.html', {
@@ -384,10 +396,6 @@ var Application = (function() {
 
         }
 
-        p_injectVars () {
-            
-        }
-
         p_injectStatic () {
 
         }
@@ -395,7 +403,7 @@ var Application = (function() {
         p_injectVendors () {
             this.applogger('        [injectVendorScripts]');
             var jsVendorsFiles = [];
-            if (isBuild()) {
+            if (isDeloyment()) {
                 jsVendorsFiles = ['app/vendors.js'];
             } else {
                 jsVendorsFiles = bowerFiles({
@@ -453,7 +461,18 @@ function doForEachApp(cb) {
     return gulp.series(...series);
 }
 
-function taskBuildAll () {
+function taskBuild () {
+    return doForEachApp((appName) => {
+        var app = new Application({
+            name: appName,
+            baseCfg: baseConfig,
+            ver: buildVersion,
+            env: env
+        });
+        return app.t_build();
+    });
+}
+function taskBuildDist () {
     return doForEachApp((appName) => {
         var app = new Application({
             name: appName,
@@ -465,7 +484,9 @@ function taskBuildAll () {
     });
 }
 
-gulp.task('default', taskBuildAll());
+gulp.task('default', taskBuild());
+gulp.task('build', taskBuild());
+gulp.task('build-dist', taskBuildDist());
 
 
 
@@ -492,7 +513,7 @@ gulp.task('default', taskBuildAll());
 //     var appConfig = config.apps[appName][env];
 //     // update config (combine common with local and env configs)
 //     appConfig.VERSION = buildVersion;
-//     appConfig.DEBUG = !isBuild();
+//     appConfig.DEBUG = !isDeloyment();
 //     appConfig.ENV = env;
 //     appConfig.STATICDIR = path.urlStatic;
 //     // adding both local and common values
@@ -525,7 +546,7 @@ gulp.task('default', taskBuildAll());
 // function injectAppScripts(appName) {
 //     logger('        [injectAppScripts]');
 //     var jsAppFiles = [];
-//     if (isBuild) {
+//     if (isDeloyment) {
 //         jsAppFiles = ['solution/' + appName + '/' + appName + '.js'];
 //     } else {
 //         jsAppFiles = ['solution/' + appName + '/app.js', 'solution/' + appName + '/**/*.js'];
@@ -543,7 +564,7 @@ gulp.task('default', taskBuildAll());
 // function injectVendors() {
 //     logger('        [injectVendorScripts]');
 //     var jsVendorsFiles = [];
-//     if (isBuild) {
+//     if (isDeloyment) {
 //         jsVendorsFiles = ['solution/vendors.js'];
 //     } else {
 //         jsVendorsFiles = bowerFiles({
@@ -567,7 +588,7 @@ gulp.task('default', taskBuildAll());
 // function injectLibs() {
 //     logger('        [injectAppLibs]');
 //     var jsAppFiles = [];
-//     if (isBuild) {
+//     if (isDeloyment) {
 //         jsAppFiles = ['solution/libs.js'];
 //     } else {
 //         jsAppFiles = ['libs/**/*.js'];
@@ -667,7 +688,7 @@ gulp.task('default', taskBuildAll());
 // }
 
 // function compressAppTemplates() {
-//     if (!isBuild) {
+//     if (!isDeloyment) {
 //         return false;
 //     }
 //     return doForEachApp(function (appName) {
@@ -868,7 +889,7 @@ gulp.task('default', taskBuildAll());
 // /******* startup taks *******/
 
 // // default task
-// if (isBuild) {
+// if (isDeloyment) {
 //     gulp.task('default', ['package']);
 // } else {
 //     gulp.task('default', ['app:html'], watchLocalChanges);
