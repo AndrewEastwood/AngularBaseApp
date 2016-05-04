@@ -1,0 +1,12 @@
+<div class="app-component app-component-todo-list">
+    <h1>{{title}}</h1>
+    <ul >
+        <li ng-repeat="item as items track by $index">
+            <input type="checkbox" ng-click="item.done=true"></input>
+            <span>item.name</span>
+        </li>
+    </ul>
+    <hr>
+    <input ng-model="newItem"/>
+    <c-button ng-click="add">Add to list</c-button>
+</div>
