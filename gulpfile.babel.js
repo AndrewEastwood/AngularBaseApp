@@ -173,7 +173,8 @@ var Application = (function() {
                     assets: this.combinePathDir(this.getPathToFileInAppDir, 'assets'),
                     assetsCss: this.combinePathDir(this.getPathToFileInAppDir, 'assets', 'css'),
                     assetsStyles: this.combinePathDir(this.getPathToFileInAppDir, 'assets', 'styles'),
-                    vendors: this.combinePathDir(this.getPathToFileInAppDir, 'vendors')
+                    vendors: this.combinePathDir(this.getPathToFileInAppDir, 'vendors'),
+                    static: this.combinePathDir(this.getPathToFileInAppDir, this.staticDirName)
                 },
                 dist: {
                     app: this.getPathToFileInDistAppDir(),
@@ -186,7 +187,8 @@ var Application = (function() {
                     assets: this.combinePathDir(this.getPathToFileInDistAppDir, 'assets'),
                     assetsCss: this.combinePathDir(this.getPathToFileInDistAppDir, 'assets', 'css'),
                     assetsStyles: this.combinePathDir(this.getPathToFileInDistAppDir, 'assets', 'styles'),
-                    vendors: this.combinePathDir(this.getPathToFileInDistAppDir, 'vendors')
+                    vendors: this.combinePathDir(this.getPathToFileInDistAppDir, 'vendors'),
+                    static: this.combinePathDir(this.getPathToFileInDistAppDir, this.staticDirNameDist)
                 }
             };
             paths.run = this.isDeloyment ? paths.dist : paths.src;
@@ -196,14 +198,20 @@ var Application = (function() {
             urls = {
                 // static: this.isDeloyment ? this.combinePathDir(cfg.staticRoot, this.distName) : 
                 //     this.combinePathDir(cfg.staticRoot, this.name)
-                static: this.staticPath
+                static: this.staticUrlPath
             };
             privates.get(this).urls = urls;
         }
 
-        get staticPath () {
+        get staticDirName () {
+            return '';
+        }
+        get staticDirNameDist () {
+            return `${STATIC_DIR_NAME}_${this.ver}`;
+        }
+        get staticUrlPath () {
             if (this.isDeloyment) {
-                return this.combinePathDir(cfg.staticUrlPrefix, `${STATIC_DIR_NAME}_${this.ver}`)
+                return this.combinePathDir(this.config.staticUrlPrefix, this.staticDirNameDist)
             }
             return this.config.staticUrlPrefix;
         }
@@ -290,7 +298,7 @@ var Application = (function() {
         }
 
         getBustedStaticFileUrl (fileName) {
-            return this.staticUrl + fileName + (this.config.bustFiles ? this.bust : '');
+            return this.staticUrlPath + fileName + (this.config.bustFiles ? this.bust : '');
         }
 
         //-------- TASKS
@@ -542,66 +550,103 @@ var Application = (function() {
 
         p_createPackage () {
 
-            // move app js files
-            var vendorsJs = gulp.src(['solution/vendors.js'], {
-                cwd: path.dist
-            }).pipe(gulp.dest('app', {
-                cwd: path.distStatic
-            }));
-            var libsJs = gulp.src(['solution/libs.js'], {
-                cwd: path.dist
-            }).pipe(gulp.dest('app', {
-                cwd: path.distStatic
-            }));
 
-            var appJs = doForEachApp(function (appName) {
-                return gulp.src(['solution/' + appName + '/' + appName + '.js'], {
-                        cwd: path.dist
-                    })
-                    .pipe(gulp.dest(path.distStatic + 'solution/' + appName + '/'));
-            }, 'structure', 'moving template files');
+            // // move app js files
+            // var vendorsJs = gulp.src(['solution/vendors.js'], {
+            //     cwd: path.dist
+            // }).pipe(gulp.dest('app', {
+            //     cwd: path.distStatic
+            // }));
+            // var libsJs = gulp.src(['solution/libs.js'], {
+            //     cwd: path.dist
+            // }).pipe(gulp.dest('app', {
+            //     cwd: path.distStatic
+            // }));
 
-            var appTpl = doForEachApp(function (appName) {
-                return gulp.src(['solution/' + appName + '/**/*.html'], {
-                        cwd: path.dist
-                    })
-                    .pipe(gulp.dest(path.distStatic + 'solution/' + appName + '/'));
-            }, 'structure', 'moving template files');
+            // var appJs = doForEachApp(function (appName) {
+            //     return gulp.src(['solution/' + appName + '/' + appName + '.js'], {
+            //             cwd: path.dist
+            //         })
+            //         .pipe(gulp.dest(path.distStatic + 'solution/' + appName + '/'));
+            // }, 'structure', 'moving template files');
 
-            // move assets
-            var assets = gulp.src(['assets/**'], {
-                    cwd: path.dist
-                })
-                .pipe(gulp.dest('assets', {
-                    cwd: path.distStatic
-                }));
 
-            // copy only necessary vendors' files
-            var vendors = gulp.src(['./vendors/**/*.css', './vendors/**/*.min.js', './vendors/**/fonts/**'], {
-                    cwd: path.dist
-                })
-                .pipe(gulp.dest('vendors', {
-                    cwd: path.distStatic
-                }));
+            var move2static = () => {
+                return gulp.src([
+                        this.getPathToFileInDistAppDir('app.min.js'),
+                        this.getPathToFileInDistAppDir('libs.min.js'),
+                        this.getPathToFileInDistAppDir('vendors.min.js'),
+                        this.getPathToFileInDistAppDir('**/*.html'),
+                        this.paths.dist.assets,
+                        this.combinePath(this.paths.run.vendors, '**/*.css'),
+                        this.combinePath(this.paths.run.vendors, '**/*.min.js'),
+                        this.combinePath(this.paths.run.vendors, '**/fonts/**'),
+                        this.combinePath(this.paths.run.libs, '**/*.css'),
+                        this.combinePath(this.paths.run.libs, '**/*.min.js'),
+                        this.combinePath(this.paths.run.libs, '**/fonts/**'),
+                    ])
+                    .pipe(gulp.dest(that.paths.dist.static))
+            }
 
-            var libs = gulp.src(['./libs/**/*.css', './libs/**/*.min.js', './libs/**/fonts/**'], {
-                    cwd: path.dist
-                })
-                .pipe(gulp.dest('libs', {
-                    cwd: path.distStatic
-                }));
+            // var appTpl = doForEachApp(function (appName) {
+            //     return gulp.src(['solution/' + appName + '/**/*.html'], {
+            //             cwd: path.dist
+            //         })
+            //         .pipe(gulp.dest(path.distStatic + 'solution/' + appName + '/'));
+            // }, 'structure', 'moving template files');
 
-            // cleanup files
-            var topDistStatic = gulp.src(['./solution/', './assets/', './vendors/', './libs/', '*.tpl.html', '**/*.orig'], {
-                cwd: path.dist
-            }).pipe(clean());
+            // // move assets
+            // var assets = gulp.src(['assets/**'], {
+            //         cwd: path.dist
+            //     })
+            //     .pipe(gulp.dest('assets', {
+            //         cwd: path.distStatic
+            //     }));
 
-            var combinedStatic = gulp.src(['./assets/styles', './assets/css/**/*.map'], {
-                cwd: path.distStatic
-            }).pipe(clean());
+            // // copy only necessary vendors' files
+            // var vendors = gulp.src(['./vendors/**/*.css', './vendors/**/*.min.js', './vendors/**/fonts/**'], {
+            //         cwd: path.dist
+            //     })
+            //     .pipe(gulp.dest('vendors', {
+            //         cwd: path.distStatic
+            //     }));
 
-            return merge(appJs, appTpl, vendorsJs, libsJs, assets, vendors, libs,
-                topDistStatic, combinedStatic);
+            // var libs = gulp.src(['./libs/**/*.css', './libs/**/*.min.js', './libs/**/fonts/**'], {
+            //         cwd: path.dist
+            //     })
+            //     .pipe(gulp.dest('libs', {
+            //         cwd: path.distStatic
+            //     }));
+
+            var cleanInDist = () => {
+                return gulp.src([
+                        this.combinePathDir(this.paths.run.app, 'api'),
+                        this.combinePathDir(this.paths.run.app, 'assets'),
+                        this.combinePathDir(this.paths.run.app, 'bricks'),
+                        this.combinePathDir(this.paths.run.app, 'components'),
+                        this.combinePathDir(this.paths.run.app, 'libs'),
+                        this.combinePathDir(this.paths.run.app, 'pages'),
+                        this.combinePathDir(this.paths.run.app, 'vendors'),
+                        this.combinePath(this.paths.run.app, '*.tpl.html'),
+                        this.combinePath(this.paths.run.app, '**/*.orig'),
+                        this.combinePath(this.paths.run.static, '**/styles/**'),
+                    ])
+                    .pipe(clean());
+            };
+
+            // // cleanup files
+            // var topDistStatic = gulp.src(['./solution/', './assets/', './vendors/', './libs/', '*.tpl.html', '**/*.orig'], {
+            //     cwd: path.dist
+            // }).pipe(clean());
+
+            // var combinedStatic = gulp.src(['./assets/styles', './assets/css/**/*.map'], {
+            //     cwd: path.distStatic
+            // }).pipe(clean());
+
+            return merge(move2static, cleanInDist);
+
+            // return merge(appJs, appTpl, vendorsJs, libsJs, assets, vendors, libs,
+            //     topDistStatic, combinedStatic);
         }
 
         p_lintJs () {
