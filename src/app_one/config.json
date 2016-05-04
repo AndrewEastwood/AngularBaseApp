@@ -1,6 +1,11 @@
 {
     "common": {
-        "staticPath": "/static/"
+        "staticUrlPrefix": "/",
+        "bundles": [{
+            "putInto": "static",
+            "globs": ["api", "assets", "components", "libs", "pages"]
+        }],
+        "bustFiles": false
     },
     "debug": {
         "cookieHost": "localhost",

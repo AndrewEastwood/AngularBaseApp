@@ -5,7 +5,7 @@
     /*             NG Setup             */
     /************************************/
 
-    angular.module('service.api', [])
+    angular.module('api@0.1', [])
         .provider('AppApiConfig', AppApiConfig)
         .service('AppApi', apiService);
 

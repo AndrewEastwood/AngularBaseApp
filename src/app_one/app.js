@@ -41,9 +41,9 @@
         'resolvers',
         'filters'
     ];
-    var appServices = ['service.api'];
-    var appViews = ['view.home'];
-    var appComponents = ['com.button'];
+    var appServices = ['api@0.1'];
+    var appViews = ['pages.home'];
+    var appComponents = ['com.todoList'];
 
     run.$inject = ['$window', '$state', '$stateParams', '$rootScope'];
     function run ($window, $state, $stateParams, $rootScope) {

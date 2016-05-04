@@ -4,7 +4,7 @@
     /************************************/
     /*             NG Setup             */
     /************************************/
-    angular.module('view.home', [])
+    angular.module('pages.home', [])
         .config(viewConfig);
 
 

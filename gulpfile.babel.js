@@ -13,9 +13,9 @@ import rename from "gulp-rename";
 import yargs from "yargs";
 import gulpFilter from 'gulp-filter'; // ?
 import clean from 'gulp-clean';
-import jshint from 'gulp-jshint';
-import stylish from 'jshint-stylish';
-// import merge from 'merge-stream';
+import eslint from 'gulp-eslint';
+// import stylish from 'jshint-stylish';
+import merge from 'merge-stream';
 import templateCache from 'gulp-angular-templatecache';
 import preprocess from 'gulp-preprocess';
 import less from 'gulp-less';
@@ -43,12 +43,12 @@ var
 
 
 
-if (!baseConfig) {
-    throw "Cannot find base configuration in the main config.json";
-}
+// if (!baseConfig) {
+//     throw "Cannot find base configuration in the main config.json";
+// }
 
 if (apps.length === 0) {
-    throw "No applications";
+    throw "No applications present";
 }
 
 // // load local config file
@@ -135,6 +135,8 @@ var Application = (function() {
         return chunks.join('/').replace(/\/\//g, '/');
     }
 
+    var getDirNameFromPath = (path) => path.match(/([^\/]*)\/*$/)[1];
+
     class _Application {
         constructor ({name: appName, baseCfg: baseConfig, ver: ver, env: env}) {
             
@@ -151,18 +153,23 @@ var Application = (function() {
 
             this.applogger('initializing');
 
-            var pathToBowerJson = this.getPathToFileInAppDir('bower.json'),
-                appConfigGeneral = require(this.getPathToFileInAppDir('config.json')),
+            var appConfigGeneral = require(this.getPathToFileInAppDir('config.json')),
                 appConfigGeneralCurrEnv = appConfigGeneral[this.env],
                 paths = {},
                 urls = {},
                 cfg = {};
 
-            cfg = extend(true, baseConfig.base, baseConfig.common,
+            cfg = extend(true, baseConfig.common,
                 appConfigGeneral.common || {}, appConfigGeneralCurrEnv)
             paths = {
                 src: {
                     app: this.getPathToFileInAppDir(),
+                    bowerJson: this.getPathToFileInAppDir('bower.json'),
+                    api: this.combinePathDir(this.getPathToFileInAppDir, 'api'),
+                    bricks: this.combinePathDir(this.getPathToFileInAppDir, 'bricks'),
+                    components: this.combinePathDir(this.getPathToFileInAppDir, 'components'),
+                    pages: this.combinePathDir(this.getPathToFileInAppDir, 'pages'),
+                    libs: this.combinePathDir(this.getPathToFileInAppDir, 'libs'),
                     assets: this.combinePathDir(this.getPathToFileInAppDir, 'assets'),
                     assetsCss: this.combinePathDir(this.getPathToFileInAppDir, 'assets', 'css'),
                     assetsStyles: this.combinePathDir(this.getPathToFileInAppDir, 'assets', 'styles'),
@@ -170,6 +177,12 @@ var Application = (function() {
                 },
                 dist: {
                     app: this.getPathToFileInDistAppDir(),
+                    bowerJson: this.getPathToFileInDistAppDir('bower.json'),
+                    api: this.combinePathDir(this.getPathToFileInDistAppDir, 'api'),
+                    bricks: this.combinePathDir(this.getPathToFileInDistAppDir, 'bricks'),
+                    components: this.combinePathDir(this.getPathToFileInDistAppDir, 'components'),
+                    pages: this.combinePathDir(this.getPathToFileInDistAppDir, 'pages'),
+                    libs: this.combinePathDir(this.getPathToFileInDistAppDir, 'libs'),
                     assets: this.combinePathDir(this.getPathToFileInDistAppDir, 'assets'),
                     assetsCss: this.combinePathDir(this.getPathToFileInDistAppDir, 'assets', 'css'),
                     assetsStyles: this.combinePathDir(this.getPathToFileInDistAppDir, 'assets', 'styles'),
@@ -177,19 +190,25 @@ var Application = (function() {
                 }
             };
             paths.run = this.isDeloyment ? paths.dist : paths.src;
-            urls = {
-                static: this.isDeloyment ? this.combinePathDir(cfg.staticPath, this.distName) : 
-                    this.combinePathDir(cfg.staticPath, this.name)
-            };
-
             privates.get(this).cfg = cfg;
             privates.get(this).paths = paths;
+
+            urls = {
+                // static: this.isDeloyment ? this.combinePathDir(cfg.staticRoot, this.distName) : 
+                //     this.combinePathDir(cfg.staticRoot, this.name)
+                static: this.staticPath
+            };
             privates.get(this).urls = urls;
         }
 
-        // get staticDirName () { return this.isDeloyment ? `${STATIC_DIR_NAME}_${this.ver}` : STATIC_DIR_NAME; }
+        get staticPath () {
+            if (this.isDeloyment) {
+                return this.combinePathDir(cfg.staticUrlPrefix, `${STATIC_DIR_NAME}_${this.ver}`)
+            }
+            return this.config.staticUrlPrefix;
+        }
         get name () { return privates.get(this).name; }
-        get distName () { return privates.get(this).name + '_' + this.ver; }
+        get distName () { return privates.get(this).name; }
         get ver () { return privates.get(this).ver; }
         get env () { return privates.get(this).env; }
         get bust () { return `?bust=${this.ver}`; }
@@ -198,6 +217,8 @@ var Application = (function() {
         get config () { return privates.get(this).cfg; }
         get paths () { return privates.get(this).paths; }
         get urls () { return privates.get(this).urls; }
+        get staticUrl () { return this.urls.static; }
+        get mainHtmlFiles () { return this.config.mainHtmlFiles; }
         get injectables () {
             // var appConfig = this.getAppConfig();
             // appConfig.VERSION = buildVersion;
@@ -215,16 +236,33 @@ var Application = (function() {
                 ENV: this.env,
                 CONFIG: JSON.stringify(this.config),
                 CONFIGJSON: this.config,
-                STATICDIR: this.urls.static,
+                STATICDIR: this.staticUrl,
                 VERSION: this.ver,
                 BUST: this.bust,
                 APP: this.name
             };
-            console.log('appvars', appvars);
+            // console.log('appvars', appvars);
             return appvars;
         }
-
-
+        appJsFilesGlobsArray (k = 'run') {
+            var wrkPh = this.paths[k.toLowerCase().trim()],
+                jsAppFiles = [
+                    this.combinePath(wrkPh.app, 'app.js'),
+                    this.combinePath(wrkPh.api, '**/*.js'),
+                    this.combinePath(wrkPh.bricks, '**/*.js'),
+                    this.combinePath(wrkPh.components, '**/*.js'),
+                    this.combinePath(wrkPh.pages, '**/*.js')
+                ];
+            return jsAppFiles;
+        }
+        appHtmlFilesGlobsArray (k = 'run') {
+            var wrkPh = this.paths[k.toLowerCase().trim()],
+                jsAppFiles = [
+                    this.combinePath(wrkPh.components, '**/*.html'),
+                    this.combinePath(wrkPh.pages, '**/*.html')
+                ];
+            return jsAppFiles;
+        }
 
         combinePath (...p) {
             return combinePath.bind(this)(...p);
@@ -251,78 +289,53 @@ var Application = (function() {
             logger(`        [${this.name}.${fn}] ${params.join(' ')}`);
         }
 
-        // hasEnvConfig (env) {
-        //     if (env) {
-        //         return config && config.apps && config.apps[name] && config.apps[name][env];
-        //     }
-        //     return config && config.apps && config.apps[name];
-        // }
+        getBustedStaticFileUrl (fileName) {
+            return this.staticUrl + fileName + (this.config.bustFiles ? this.bust : '');
+        }
 
         //-------- TASKS
 
         t_build () {
+            var tasks = this.t_buildNoWatch();
+            if (!this.isDeloyment) {
+                tasks.push(this.p_watch.bind(this));
+            }
+            return tasks;
+        }
+
+        t_buildNoWatch () {
             if (this.isDeloyment) {
                 return this.t_buildDist();
             }
-            // this.appFnLogger('t_build', 'starting');
             return [
+                this.p_lintJs.bind(this),
                 this.p_InstallBowerDeps.bind(this),
-                ...this.p_genCss.bind(this)()
+                gulp.parallel([
+                    this.p_transformTemplate.bind(this),
+                    gulp.series(...this.t_genCss.bind(this)())
+                ])
             ];
         }
 
         t_buildDist () {
-            // this.appFnLogger('t_buildDist', 'starting');
             return [
+                this.p_lintJs.bind(this),
                 this.p_InstallBowerDeps.bind(this),
                 this.p_clearDist.bind(this),
                 this.p_copyFiles.bind(this),
-                ...this.p_genCss.bind(this)(),
-                gulp.parallel(this.p_clearDist2.bind(this),
-                    this.p_clearDist3.bind(this))
+                gulp.parallel([
+                    this.p_transformTemplate.bind(this),
+                    gulp.series(...this.t_genCss.bind(this)()),
+                    this.p_compressAppJs.bind(this),
+                    this.p_compressVendorsJs.bind(this),
+                    this.p_compressLibJs.bind(this),
+                    this.p_compressHtml.bind(this)
+                ]),
+                this.p_createPackage.bind(this)
             ];
         }
 
-        //--------- FILE MODIFIERS
-
-        p_clearDist2 () {
-            // this.appFnLogger('p_clearDist', 'cleaning ' + this.paths.dist.app);
-            return gulp.src(this.paths.dist.app+'_2', {allowEmpty: true})
-                .pipe(clean())
-                .on('end', () => this.appFnLogger('p_clearDist2', 'done'));
-        }
-
-        p_clearDist3 () {
-            // this.appFnLogger('p_clearDist', 'cleaning ' + this.paths.dist.app);
-            return gulp.src(this.paths.dist.app+'_3', {allowEmpty: true})
-                .pipe(clean())
-                .on('end', () => this.appFnLogger('p_clearDist3', 'done'));
-        }
-
-        p_InstallBowerDeps () {
-            // this.appFnLogger('p_InstallBowerDeps');
-            return bower({cwd: this.paths.run.app})
-                .pipe(gulp.dest(this.paths.run.vendors));
-        }
-
-        p_clearDist () {
-            this.appFnLogger('p_clearDist', 'cleaning ' + this.paths.dist.app);
-            return gulp.src(this.paths.dist.app, {allowEmpty: true})
-                .pipe(clean())
-                .on('end', () => this.appFnLogger('p_clearDist', 'done'));
-        }
-
-        p_copyFiles () {
-            this.appFnLogger('p_copyFiles', 'copying files to ' + this.paths.dist.app);
-            return gulp.
-                src(['**/*', '!assets/{css,css/**}'], {
-                    cwd: this.paths.src.app
-                })
-                .pipe(gulp.dest(this.paths.dist.app))
-                // .on('end', () => this.appFnLogger('p_copyFiles', 'done'));
-        }
-
-        p_genCss () {
+        t_genCss () {
             var canUglify = this.canUglify;
             var _cssRemoveDir = () => {
                 return gulp.src(this.paths.run.assetsCss, {allowEmpty: true})
@@ -357,7 +370,6 @@ var Application = (function() {
                     .pipe(gulp.dest('.', {
                         cwd: this.paths.run.assetsCss
                     }))
-                    // .on('end', () => this.appFnLogger('_cssGenerate', 'done'))
             };
             var _cssRemoveNonCssFiles = () => {
                 return gulp.src(['*.less', '**/*.less', '_**'], {
@@ -367,69 +379,251 @@ var Application = (function() {
             return [_cssRemoveDir, _cssCopyAllStylesIntoCssDir, _cssGenerate, _cssRemoveNonCssFiles];
         }
 
-        p_transformTemplate () {
-            return gulp.src('index.tpl.html', {
-                    cwd: path.src.app
-                })
-                .pipe(injectAppVars(appName))
-                .pipe(injectAppScripts(appName))
-                .pipe(injectAppScripts('shared'))
-                .pipe(injectVendors())
-                .pipe(injectLibs())
-                .pipe(rename(appName + '.html'))
-                .pipe(gulp.dest(path.app));
+        t_lintJs () {
+            return [p_lintJs];
+        }
+        //--------- FILE MODIFIERS
+
+        p_clearDist2 () {
+            return gulp.src(this.paths.dist.app+'_2', {allowEmpty: true})
+                .pipe(clean())
+                .on('end', () => this.appFnLogger('p_clearDist2', 'done'));
         }
 
-        p_transformLess () {
+        p_clearDist3 () {
+            return gulp.src(this.paths.dist.app+'_3', {allowEmpty: true})
+                .pipe(clean())
+                .on('end', () => this.appFnLogger('p_clearDist3', 'done'));
+        }
 
+        p_InstallBowerDeps () {
+            var fs = require('fs');
+            if (!fs.existsSync(this.paths.run.bowerJson))
+                return gulp.src('nothing', {allowEmpty: true}).pipe(nop());
+            return bower({ cwd: this.paths.run.app, directory: getDirNameFromPath(this.paths.run.vendors) })
+                .pipe(debug())
+                .pipe(gulp.dest(this.paths.run.vendors));
+        }
+
+        p_clearDist () {
+            this.appFnLogger('p_clearDist', 'cleaning ' + this.paths.dist.app);
+            return gulp.src(this.paths.dist.app, {allowEmpty: true})
+                .pipe(clean())
+                .on('end', () => this.appFnLogger('p_clearDist', 'done'));
+        }
+
+        p_copyFiles () {
+            this.appFnLogger('p_copyFiles', 'copying files to ' + this.paths.dist.app);
+            return gulp.
+                src(['**/*', '!assets/{css,css/**}'], {
+                    cwd: this.paths.src.app
+                })
+                .pipe(gulp.dest(this.paths.dist.app))
+        }
+
+        p_transformTemplate () {
+            var that = this;
+
+            var transform = (filepath) => {
+                if (filepath.indexOf('.js') > -1) {
+                    return '<script crossorigin="anonymous" src="' + that.getBustedStaticFileUrl(filepath) + '"></script>';
+                } else {
+                    return '<link rel="stylesheet" type="text/css" href="' + that.getBustedStaticFileUrl(filepath) + '"/>';
+                }
+            }
+
+            var injectAppScripts = () => {
+                var jsAppFiles = [];
+                if (that.isDeloyment) {
+                    jsAppFiles = [that.combinePath(that.paths.run.app, 'app.min.js')];
+                } else {
+                    jsAppFiles = that.appJsFilesGlobsArray();
+                }
+                return inject(gulp.src(jsAppFiles, {read: false}), {
+                    relative: true,
+                    transform: transform,
+                    name: 'app'
+                });
+            }
+
+            var injectVendors = () => {
+                var jsVendorsFiles = [];
+                if (that.isDeloyment) {
+                    jsVendorsFiles = [that.combinePath(that.paths.run.app, 'vendors.min.js')];
+                } else {
+                    jsVendorsFiles = bowerFiles({
+                        filter: /.*\.js$/,
+                        paths: {
+                            bowerJson: that.paths.run.bowerJson,
+                            bowerDirectory: that.paths.run.vendors
+                        }
+                    });
+                }
+                return inject(gulp.src(jsVendorsFiles, {read: false}), {
+                    relative: true,
+                    transform: transform,
+                    name: 'bower'
+                });
+            }
+
+            var injectLibs = () => {
+                var jsAppFiles = [];
+                if (that.isDeloyment) {
+                    jsAppFiles = [that.combinePath(that.paths.run.app, 'libs.min.js')];
+                } else {
+                    jsAppFiles = [that.combinePath(that.paths.run.libs, '**/*.js')];
+                }
+                return inject(gulp.src(jsAppFiles, {read: false}), {
+                    relative: true,
+                    transform: transform,
+                    name: 'libs'
+                });
+            }
+
+            // TODO: index.tpl.html can be a default value
+            //       that will be taken from the combined
+            //       config file.
+            //       Later we can specify either array with templates
+            //       or single file to be processed
+
+            var html2compress = this.mainHtmlFiles.map((fName) => {
+                return gulp.src(that.combinePath(that.paths.run.app, `${fName}.tpl.html`))
+                    .pipe(preprocess({
+                        context: this.injectables
+                    }))
+                    .pipe(injectAppScripts())
+                    .pipe(injectVendors())
+                    .pipe(injectLibs())
+                    .pipe(rename(`${fName}.html`))
+                    .pipe(gulp.dest(that.paths.run.app));
+            });
+
+            return merge(...html2compress);
         }
 
         p_compressAppJs () {
-
+            return gulp.src(this.appJsFilesGlobsArray())
+                .pipe(concat('app.min.js'))
+                .pipe(this.canUglify ? uglify() : nop())
+                .pipe(gulp.dest(this.paths.dist.app));
         }
 
         p_compressVendorsJs () {
-
+            return gulp.src(bowerFiles({
+                    paths: {
+                        bowerJson: this.paths.run.bowerJson,
+                        bowerDirectory: this.paths.run.vendors
+                    }
+                }))
+                .pipe(gulpFilter(['*.js']))
+                .pipe(concat('vendors.min.js'))
+                .pipe(this.canUglify ? uglify() : nop())
+                .pipe(gulp.dest(that.paths.run.app));
         }
 
         p_compressLibJs () {
-
+            return gulp.src(that.combinePath(that.paths.run.libs, '**/*.js'))
+                .pipe(concat('libs.min.js'))
+                .pipe(this.canUglify ? uglify() : nop())
+                .pipe(gulp.dest(that.paths.run.app));
         }
 
-        p_injectStatic () {
-
-        }
-
-        p_injectVendors () {
-            this.applogger('        [injectVendorScripts]');
-            var jsVendorsFiles = [];
-            if (isDeloyment()) {
-                jsVendorsFiles = ['app/vendors.js'];
-            } else {
-                jsVendorsFiles = bowerFiles({
-                    filter: /.*\.js$/,
-                    paths: {
-                        bowerJson: pathToBowerJson,
-                        bowerDirectory: pathToVendors
-                    }
-                });
+        p_compressHtml () {
+            if (!this.isDeloyment) {
+                return false;
             }
-            // console.dir(jsVendorsFiles);
-            return inject(gulp.src(jsVendorsFiles, {
-                cwd: path.app
-            }), {
-                relative: true,
-                transform: transform,
-                name: 'bower'
-            });
-        }
-
-        p_cleanup () {
-
+            return gulp.src(this.appHtmlFilesGlobsArray())
+                .pipe(preprocess({
+                    context: this.injectables
+                }))
+                .pipe(this.canUglify ? minifyHTML() : nop())
+                .pipe(gulp.dest(that.paths.run.app));
         }
 
         p_createPackage () {
 
+            // move app js files
+            var vendorsJs = gulp.src(['solution/vendors.js'], {
+                cwd: path.dist
+            }).pipe(gulp.dest('app', {
+                cwd: path.distStatic
+            }));
+            var libsJs = gulp.src(['solution/libs.js'], {
+                cwd: path.dist
+            }).pipe(gulp.dest('app', {
+                cwd: path.distStatic
+            }));
+
+            var appJs = doForEachApp(function (appName) {
+                return gulp.src(['solution/' + appName + '/' + appName + '.js'], {
+                        cwd: path.dist
+                    })
+                    .pipe(gulp.dest(path.distStatic + 'solution/' + appName + '/'));
+            }, 'structure', 'moving template files');
+
+            var appTpl = doForEachApp(function (appName) {
+                return gulp.src(['solution/' + appName + '/**/*.html'], {
+                        cwd: path.dist
+                    })
+                    .pipe(gulp.dest(path.distStatic + 'solution/' + appName + '/'));
+            }, 'structure', 'moving template files');
+
+            // move assets
+            var assets = gulp.src(['assets/**'], {
+                    cwd: path.dist
+                })
+                .pipe(gulp.dest('assets', {
+                    cwd: path.distStatic
+                }));
+
+            // copy only necessary vendors' files
+            var vendors = gulp.src(['./vendors/**/*.css', './vendors/**/*.min.js', './vendors/**/fonts/**'], {
+                    cwd: path.dist
+                })
+                .pipe(gulp.dest('vendors', {
+                    cwd: path.distStatic
+                }));
+
+            var libs = gulp.src(['./libs/**/*.css', './libs/**/*.min.js', './libs/**/fonts/**'], {
+                    cwd: path.dist
+                })
+                .pipe(gulp.dest('libs', {
+                    cwd: path.distStatic
+                }));
+
+            // cleanup files
+            var topDistStatic = gulp.src(['./solution/', './assets/', './vendors/', './libs/', '*.tpl.html', '**/*.orig'], {
+                cwd: path.dist
+            }).pipe(clean());
+
+            var combinedStatic = gulp.src(['./assets/styles', './assets/css/**/*.map'], {
+                cwd: path.distStatic
+            }).pipe(clean());
+
+            return merge(appJs, appTpl, vendorsJs, libsJs, assets, vendors, libs,
+                topDistStatic, combinedStatic);
+        }
+
+        p_lintJs () {
+            return gulp.src(this.appJsFilesGlobsArray('src'))
+                .pipe(eslint())
+                .pipe(eslint.format())
+                .pipe(eslint.results(function (results) {
+                    // Called once for all ESLint results.
+                    console.log('Total Results: ' + results.length);
+                    console.log('Total Warnings: ' + results.warningCount);
+                    console.log('Total Errors: ' + results.errorCount);
+                }))
+                .pipe(eslint.failAfterError());
+        }
+
+        p_watch () {
+            gulp.watch(this.appJsFilesGlobsArray(), this.p_lintJs.bind(this));
+            // gulp.watch('ui/src/assets/styles/**', ['app:css']);
+            // gulp.watch('ui/src/*.tpl.html', ['app:html']);
+            // gulp.watch('config*.json', ['app:html']);
+            // gulp.watch('bower.json', ['app:html']);
+            // gulp.watch('.jshintrc', ['app:lintjs']);
         }
 
     }
@@ -461,6 +655,18 @@ function doForEachApp(cb) {
     return gulp.series(...series);
 }
 
+function taskBuildNoWatch () {
+    return doForEachApp((appName) => {
+        var app = new Application({
+            name: appName,
+            baseCfg: baseConfig,
+            ver: buildVersion,
+            env: env
+        });
+        return app.t_buildNoWatch();
+    });
+}
+
 function taskBuild () {
     return doForEachApp((appName) => {
         var app = new Application({
@@ -472,6 +678,7 @@ function taskBuild () {
         return app.t_build();
     });
 }
+
 function taskBuildDist () {
     return doForEachApp((appName) => {
         var app = new Application({
@@ -486,6 +693,7 @@ function taskBuildDist () {
 
 gulp.task('default', taskBuild());
 gulp.task('build', taskBuild());
+gulp.task('build-only', taskBuildNoWatch());
 gulp.task('build-dist', taskBuildDist());
 
 

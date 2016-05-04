@@ -1,12 +1,13 @@
 {
+    "apps": ["app_one"],
+    "apps2": ["app_two", "shared"],
     "common": {
-        "solution": "Your test solution"
-    },
-    "apps": ["app_one", "app_two", "shared"],
-    "base": {
+        "solution": "Your test solution",
         "cookieHost": "",
         "hostname": "",
         "apiUrl": "",
-        "gaKey": ""
+        "gaKey": "",
+        "mainHtmlFiles": ["index"],
+        "bustFiles": true
     }
 }
