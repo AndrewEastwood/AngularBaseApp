@@ -8,12 +8,14 @@ places with less time.
 All gulp command must be invoked withing the root app's dir.
 
 ## Building a dev environment
-This command will create a folder where all the sources will be placed using rules as for dev environment.
+This command will create a folder where all the sources will be  
+placed using rules as for dev environment.
 It means that all js, CSS, and HTML won't be compressed.
 ```
 gulp --env dev
 ```
-When the build process is done, you can transfer the distro content into your dev environment.
+When the build process is done, you can transfer the distro  
+content into your dev environment.
 
 ## Building for a stage or prod environments
 The command is almost the same:
@@ -24,4 +26,5 @@ and for a production
 ```
 gulp --env prod
 ```
-In this case, you get all sources minified and ready to be moved to your environment.
+In this case, you get all sources minified and ready to be  
+moved to your environment.
