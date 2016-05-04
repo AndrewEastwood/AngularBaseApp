@@ -1,20 +1,21 @@
 # AngularBaseApp
-Using for implementing multiple apps within one solution.
+This structure helps to keep all your SPAs in one solution and
+build each application into a separate distro.
+Using that you can deploy your built apps into different  
+places with less time.
 
+# How To Build Your App
+All gulp command must be invoked withing the root app's dir.
 
-# How To Build You App
-All gulp command mut be invoked withing the root app's dir.
-
-
-## Building for a dev environment
-This will create the dist folder where all the sources will be placed using rules as for dev environment.
-It means that the all js, css and html won't be compressed.
+## Building a dev environment
+This command will create a folder where all the sources will be placed using rules as for dev environment.
+It means that all js, CSS, and HTML won't be compressed.
 ```
 gulp --env dev
 ```
-When the build process is done you can transfer the dist content into your dev environment.
+When the build process is done, you can transfer the distro content into your dev environment.
 
-## Building for a stage or prod environemtns
+## Building for a stage or prod environments
 The command is almost the same:
 ```
 gulp --env stage
@@ -23,4 +24,4 @@ and for a production
 ```
 gulp --env prod
 ```
-In this case you get all sources minified and ready to be moved to your evironment.
+In this case, you get all sources minified and ready to be moved to your environment.
