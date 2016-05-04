@@ -1,6 +1,6 @@
 # AngularBaseApp
-This structure helps to keep all your SPAs in one solution and
-build each application into a separate distro.
+This structure helps to keep all your SPAs in one solution and  
+build each application into a separate distro.  
 Using that you can deploy your built apps into different  
 places with less time.
 
