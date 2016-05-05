@@ -4,6 +4,10 @@
     /************************************/
     /*             NG Setup             */
     /************************************/
+    angular.module('api', []);
+    angular.module('pages', []);
+    angular.module('com', []);
+    angular.module('brx', []);
     angular.module('app', [].concat.apply([], [
         // External Deps
         externalDeps,
@@ -41,8 +45,8 @@
         'resolvers',
         'filters'
     ];
-    var appServices = ['api@0.1'];
-    var appViews = ['pages.home'];
+    var appServices = ['api'];
+    var appViews = ['pages'];
     var appComponents = ['com.todoList'];
 
     run.$inject = ['$window', '$state', '$stateParams', '$rootScope'];

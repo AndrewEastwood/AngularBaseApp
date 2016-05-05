@@ -2,9 +2,8 @@
   "name": "AngularBaseApp",
   "version": "0.0.1",
   "scripts": {
-    "lint": "gulp app:lintjs",
-    "styling": "gulp app:css",
-    "validate": "npm ls"
+    "validate": "npm ls",
+    "start": "node server"
   },
   "babel": {
     "presets": [
@@ -29,6 +28,7 @@
     "gulp-inject": "^1.2.0",
     "gulp-jshint": "^1.11.0",
     "gulp-less": "^3.0.3",
+    "gulp-logger": "0.0.2",
     "gulp-minify-html": "^1.0.4",
     "gulp-nop": "0.0.3",
     "gulp-plumber": "^1.0.0",
