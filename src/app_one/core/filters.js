@@ -6,7 +6,7 @@
     /*             NG Setup             */
     /************************************/
 
-    angular.module('filters', ['app.settings'])
+    angular.module('filters', ['settings'])
         .filter('appendStaticRoot', appendStaticRoot)
         .filter('prettyJSON', prettyJSON);
 

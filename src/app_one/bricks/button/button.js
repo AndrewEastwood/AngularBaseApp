@@ -4,7 +4,7 @@
     /************************************/
     /*             NG Setup             */
     /************************************/
-    angular.module('brx.button', [])
+    angular.module('brx')
         .directive('cButton', cButton);
 
 
@@ -15,8 +15,8 @@
     function cButton () {
         return {
             restrict: 'E',
-            templateUrl: '<button ng-transclude></button>',
-            scope: {},
+            template: '<button ng-transclude></button>',
+            // scope: {},
             replace: true,
             transclude: true,
             controller: controller

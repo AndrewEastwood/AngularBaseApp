@@ -4,7 +4,7 @@
     /************************************/
     /*             NG Setup             */
     /************************************/
-    angular.module('pages.home', [])
+    angular.module('pages')
         .config(viewConfig);
 
 
@@ -13,6 +13,8 @@
     /************************************/
     viewConfig.$inject = ['$stateProvider', 'globalGetStaticRootToApp'];
     function viewConfig ($stateProvider, globalGetStaticRootToApp) {
+        var tpl = globalGetStaticRootToApp('pages/home/home.html');
+        // debugger;
         $stateProvider.state('home', {
             url: '/',
             data: {
@@ -20,20 +22,7 @@
             },
             views: {
                 'content@': {
-                    templateUrl: globalGetStaticRootToApp('views/home/home.html'),
-                    controller: viewHomeController,
-                    controllerAs: 'view'
-                }
-            }
-        });
-        $stateProvider.state('home', {
-            url: '/home',
-            data: {
-                pageTitle: 'Home Page'
-            },
-            views: {
-                'content@': {
-                    templateUrl: globalGetStaticRootToApp('views/home/home.html'),
+                    templateUrl: globalGetStaticRootToApp('pages/home/home.html'),
                     controller: viewHomeController,
                     controllerAs: 'view'
                 }

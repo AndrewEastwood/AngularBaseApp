@@ -4,21 +4,32 @@
     /************************************/
     /*             NG Setup             */
     /************************************/
-    angular.module('api', []);
-    angular.module('pages', []);
-    angular.module('com', []);
-    angular.module('brx', []);
+    var externalDeps = [
+        'ngResource',
+        'ngTouch',
+        'ui.bootstrap',
+        'ui.router',
+        'ngAria',
+        'ngSanitize',
+        'ngMaterial'
+    ];
+    var appCore = [
+        'settings',
+        'resolvers',
+        'filters',
+        'interceptors'
+    ];
+    var mods = ['api', 'pages', 'com', 'brx'];
+    for (var k in mods) {
+        angular.module(mods[k], []);
+    }
     angular.module('app', [].concat.apply([], [
         // External Deps
         externalDeps,
         // App Core
         appCore,
-        // Services
-        appServices,
-        // Views
-        appViews,
-        // Components
-        appComponents
+        // App Deps
+        mods
     ]))
     .run(run);
     angular.element(document).ready(function() {
@@ -28,30 +39,15 @@
     /************************************/
     /*           IMPLEMENTATION         */
     /************************************/
-    var externalDeps = [
-        'ngResource',
-        'ngTouch',
-        'ui.bootstrap',
-        'ui.router',
-        'ngAria',
-        'ngSanitize',
-        'toastr',
-        'LocalStorageModule',
-        'ipCookie',
-        'ngIdle'
-    ];
-    var appCore = [
-        'settings',
-        'resolvers',
-        'filters'
-    ];
-    var appServices = ['api'];
-    var appViews = ['pages'];
-    var appComponents = ['com.todoList'];
+    // var appServices = ['api'];
+    // var appViews = ['pages'];
+    // var appComponents = ['com.todoList'];
 
     run.$inject = ['$window', '$state', '$stateParams', '$rootScope'];
     function run ($window, $state, $stateParams, $rootScope) {
 
     }
+
+
 
 })();

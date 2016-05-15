@@ -24,15 +24,26 @@ import nop from 'gulp-nop';
 import bower from 'gulp-bower';
 import debug from 'gulp-debug';
 import logger from 'gulp-logger';
+import {protractor} from 'gulp-protractor';
+import {karmaServer} from 'karma';
 
 var
     // application's main config file
-    baseConfig = require('./config.json'),
+    baseConfig = require('./package.json').solution,
     env = (yargs.argv.env || 'debug').toLowerCase(),
+    addWatchCmd = yargs.argv.watch === 'false' ? false : true,
     uglifySources = !/debug|dev/.test(env),
     buildVersion = (new Date()).getTime(),
     apps = baseConfig.apps || [];
 
+
+if (yargs.argv.app) {
+    apps = [yargs.argv.app];
+}
+
+gutil.log(yargs.argv);
+
+gutil.log('Active apps: ', apps);
 
 if (apps.length === 0) {
     throw "No applications present";
@@ -92,6 +103,11 @@ var Application = (function() {
             paths = {
                 src: {
                     app: this.getPathToFileInAppDir(),
+                    core: this.getPathToFileInAppDir(this.dirNames.core),
+                    tests: this.getPathToFileInAppDir(this.dirNames.tests),
+                    specs: this.combinePathDir(this.getPathToFileInAppDir(this.dirNames.tests), this.dirNames.specs),
+                    specsE2E: this.combinePathDir(this.getPathToFileInAppDir(this.dirNames.tests), this.dirNames.specs, this.dirNames.e2e),
+                    specsUnit: this.combinePathDir(this.getPathToFileInAppDir(this.dirNames.tests), this.dirNames.specs, this.dirNames.unit),
                     bowerJson: this.getPathToFileInAppDir('bower.json'),
                     api: this.combinePathDir(this.getPathToFileInAppDir, this.dirNames.api),
                     bricks: this.combinePathDir(this.getPathToFileInAppDir, this.dirNames.bricks),
@@ -106,6 +122,11 @@ var Application = (function() {
                 },
                 dist: {
                     app: this.getPathToFileInDistAppDir(),
+                    core: this.getPathToFileInDistAppDir(this.dirNames.core),
+                    tests: this.getPathToFileInDistAppDir(this.dirNames.tests),
+                    specs: this.combinePathDir(this.getPathToFileInDistAppDir(this.dirNames.tests), this.dirNames.specs),
+                    specsE2E: this.combinePathDir(this.getPathToFileInDistAppDir(this.dirNames.tests), this.dirNames.specs, this.dirNames.e2e),
+                    specsUnit: this.combinePathDir(this.getPathToFileInDistAppDir(this.dirNames.tests), this.dirNames.specs, this.dirNames.unit),
                     bowerJson: this.getPathToFileInDistAppDir('bower.json'),
                     api: this.combinePathDir(this.getPathToFileInDistAppDir, this.dirNames.api),
                     bricks: this.combinePathDir(this.getPathToFileInDistAppDir, this.dirNames.bricks),
@@ -155,6 +176,11 @@ var Application = (function() {
         get mainHtmlFiles () { return this.config.mainHtmlFiles; }
         get dirNames () {
             var dirNames = {
+                specs: 'specs',
+                e2e: 'e2e',
+                unit: 'unit',
+                tests: 'tests',
+                core: 'core',
                 api: 'api',
                 bricks: 'bricks',
                 components: 'components',
@@ -169,6 +195,8 @@ var Application = (function() {
             return dirNames;
         }
         get injectables () {
+            var config = this.config;
+            config.urls = this.urls;
             var appvars = {
                 DEBUG: !this.isDeloyment,
                 ENV: this.env,
@@ -181,14 +209,65 @@ var Application = (function() {
             };
             return appvars;
         }
-        appJsFilesGlobsArray (k = 'run') {
+        testE2ESpecsJsFilesGlobsArray (k = 'run') {
             var wrkPh = this.paths[k.toLowerCase().trim()],
                 jsAppFiles = [
-                    this.combinePath(wrkPh.app, 'app.js'),
-                    this.combinePath(wrkPh.api, '**/*.js'),
-                    this.combinePath(wrkPh.bricks, '**/*.js'),
-                    this.combinePath(wrkPh.components, '**/*.js'),
+                    this.combinePath(wrkPh.specsE2E, '*spec.js')
+                ];
+            return jsAppFiles;
+        }
+        testUnitSpecsJsFilesGlobsArray (k = 'run') {
+            var wrkPh = this.paths[k.toLowerCase().trim()],
+                jsAppFiles = [
+                    this.combinePath(wrkPh.specsUnit, '*spec.js')
+                ];
+            return jsAppFiles;
+        }
+        coreJsFilesGlobsArray (k = 'run') {
+            var wrkPh = this.paths[k.toLowerCase().trim()],
+                jsAppFiles = [
+                    this.combinePath(wrkPh.core, 'app.js'),
+                    this.combinePath(wrkPh.core, '*.js')
+                ];
+            return jsAppFiles;
+        }
+        comJsFilesGlobsArray (k = 'run') {
+            var wrkPh = this.paths[k.toLowerCase().trim()],
+                jsAppFiles = [
+                    this.combinePath(wrkPh.components, '*.js'),
+                    this.combinePath(wrkPh.components, '**/*.js')
+                ];
+            return jsAppFiles;
+        }
+        brxJsFilesGlobsArray (k = 'run') {
+            var wrkPh = this.paths[k.toLowerCase().trim()],
+                jsAppFiles = [
+                    this.combinePath(wrkPh.bricks, '*.js'),
+                    this.combinePath(wrkPh.bricks, '**/*.js')
+                ];
+            return jsAppFiles;
+        }
+        apiJsFilesGlobsArray (k = 'run') {
+            var wrkPh = this.paths[k.toLowerCase().trim()],
+                jsAppFiles = [
+                    this.combinePath(wrkPh.api, '*.js'),
+                    this.combinePath(wrkPh.api, '**/*.js')
+                ];
+            return jsAppFiles;
+        }
+        pgsJsFilesGlobsArray (k = 'run') {
+            var wrkPh = this.paths[k.toLowerCase().trim()],
+                jsAppFiles = [
+                    this.combinePath(wrkPh.pages, '*.js'),
                     this.combinePath(wrkPh.pages, '**/*.js')
+                ];
+            return jsAppFiles;
+        }
+        libJsFilesGlobsArray (k = 'run') {
+            var wrkPh = this.paths[k.toLowerCase().trim()],
+                jsAppFiles = [
+                    this.combinePath(wrkPh.libs, '*.js'),
+                    this.combinePath(wrkPh.libs, '**/*.js')
                 ];
             return jsAppFiles;
         }
@@ -232,11 +311,18 @@ var Application = (function() {
 
         //-------- TASKS
 
+        t_test () {
+            var tasks = [];
+            tasks.push(this.p_test.bind(this));
+            return tasks;
+        }
+
         t_build () {
             var tasks = this.t_buildNoWatch();
-            if (!this.isDeloyment) {
-                tasks.push(this.p_watch.bind(this));
+            if (this.isDeloyment || !addWatchCmd) {
+                return tasks;
             }
+            tasks.push(this.p_watch.bind(this));
             return tasks;
         }
 
@@ -260,7 +346,11 @@ var Application = (function() {
                 this.p_copyFiles.bind(this),
                 gulp.parallel([
                     gulp.series(...this.t_genCss.bind(this)()),
-                    this.p_compressAppJs.bind(this),
+                    this.p_compressCoreJs.bind(this),
+                    this.p_compressComJs.bind(this),
+                    this.p_compressBrxJs.bind(this),
+                    this.p_compressPgsJs.bind(this),
+                    this.p_compressApiJs.bind(this),
                     this.p_compressVendorsJs.bind(this),
                     this.p_compressLibJs.bind(this),
                     this.p_compressHtml.bind(this)
@@ -322,8 +412,8 @@ var Application = (function() {
 
             var move2static = () => {
                 return gulp.src([
-                        that.getPathToFileInDistAppDir('app.min.js'),
-                        that.getPathToFileInDistAppDir('libs.min.js'),
+                        that.getPathToFileInDistAppDir('core.min.js'),
+                        that.getPathToFileInDistAppDir('lib.min.js'),
                         that.getPathToFileInDistAppDir('vendors.min.js'),
                         that.getPathToFileInDistAppDir('**/*.html'),
                         '!' + that.getPathToFileInDistAppDir('*.html'),
@@ -341,6 +431,8 @@ var Application = (function() {
             var cleanInDist = () => {
                 return gulp.src([
                         that.combinePathDir(that.paths.run.app, that.dirNames.api),
+                        that.combinePathDir(that.paths.run.app, that.dirNames.tests),
+                        that.combinePathDir(that.paths.run.app, that.dirNames.core),
                         that.combinePathDir(that.paths.run.app, that.dirNames.assets),
                         that.combinePathDir(that.paths.run.app, that.dirNames.bricks),
                         that.combinePathDir(that.paths.run.app, that.dirNames.components),
@@ -389,17 +481,87 @@ var Application = (function() {
                 }
             }
 
-            var injectAppScripts = () => {
+            var injectCoreScripts = () => {
                 var jsAppFiles = [];
                 if (that.isDeloyment) {
-                    jsAppFiles = [that.combinePath(that.paths.run.app, 'app.min.js')];
+                    jsAppFiles = [that.combinePath(that.paths.run.app, 'core.min.js')];
                 } else {
-                    jsAppFiles = that.appJsFilesGlobsArray();
+                    jsAppFiles = that.coreJsFilesGlobsArray();
                 }
                 return inject(gulp.src(jsAppFiles, {read: false}), {
                     relative: true,
                     transform: transform,
-                    name: 'app'
+                    name: 'core'
+                });
+            }
+
+            var injectComScripts = () => {
+                var jsAppFiles = [];
+                if (that.isDeloyment) {
+                    jsAppFiles = [that.combinePath(that.paths.run.app, 'com.min.js')];
+                } else {
+                    jsAppFiles = that.comJsFilesGlobsArray();
+                }
+                return inject(gulp.src(jsAppFiles, {read: false}), {
+                    relative: true,
+                    transform: transform,
+                    name: 'com'
+                });
+            }
+
+            var injectBrxScripts = () => {
+                var jsAppFiles = [];
+                if (that.isDeloyment) {
+                    jsAppFiles = [that.combinePath(that.paths.run.app, 'brx.min.js')];
+                } else {
+                    jsAppFiles = that.brxJsFilesGlobsArray();
+                }
+                return inject(gulp.src(jsAppFiles, {read: false}), {
+                    relative: true,
+                    transform: transform,
+                    name: 'brx'
+                });
+            }
+
+            var injectApiScripts = () => {
+                var jsAppFiles = [];
+                if (that.isDeloyment) {
+                    jsAppFiles = [that.combinePath(that.paths.run.app, 'api.min.js')];
+                } else {
+                    jsAppFiles = that.apiJsFilesGlobsArray();
+                }
+                return inject(gulp.src(jsAppFiles, {read: false}), {
+                    relative: true,
+                    transform: transform,
+                    name: 'api'
+                });
+            }
+
+            var injectPgsScripts = () => {
+                var jsAppFiles = [];
+                if (that.isDeloyment) {
+                    jsAppFiles = [that.combinePath(that.paths.run.app, 'pgs.min.js')];
+                } else {
+                    jsAppFiles = that.pgsJsFilesGlobsArray();
+                }
+                return inject(gulp.src(jsAppFiles, {read: false}), {
+                    relative: true,
+                    transform: transform,
+                    name: 'pgs'
+                });
+            }
+
+            var injectLibScripts = () => {
+                var jsAppFiles = [];
+                if (that.isDeloyment) {
+                    jsAppFiles = [that.combinePath(that.paths.run.app, 'lib.min.js')];
+                } else {
+                    jsAppFiles = that.libJsFilesGlobsArray();
+                }
+                return inject(gulp.src(jsAppFiles, {read: false}), {
+                    relative: true,
+                    transform: transform,
+                    name: 'libs'
                 });
             }
 
@@ -423,20 +585,6 @@ var Application = (function() {
                 });
             }
 
-            var injectLibs = () => {
-                var jsAppFiles = [];
-                if (that.isDeloyment) {
-                    jsAppFiles = [that.combinePath(that.paths.run.app, 'libs.min.js')];
-                } else {
-                    jsAppFiles = [that.combinePath(that.paths.run.libs, '**/*.js')];
-                }
-                return inject(gulp.src(jsAppFiles, {read: false}), {
-                    relative: true,
-                    transform: transform,
-                    name: 'libs'
-                });
-            }
-
             var injectStyles = () => {
                 var cssAppFiles = that.combinePath(this.paths.run.assetsCss, '**/*.css');
                 return inject(gulp.src(cssAppFiles, {read: false}), {
@@ -451,9 +599,13 @@ var Application = (function() {
                     .pipe(preprocess({
                         context: this.injectables
                     }))
-                    .pipe(injectAppScripts())
+                    .pipe(injectCoreScripts())
+                    .pipe(injectComScripts())
+                    .pipe(injectBrxScripts())
+                    .pipe(injectApiScripts())
+                    .pipe(injectLibScripts())
+                    .pipe(injectPgsScripts())
                     .pipe(injectVendors())
-                    .pipe(injectLibs())
                     .pipe(injectStyles())
                     .pipe(rename(`${fName}.html`))
                     .pipe(gulp.dest(that.paths.run.app));
@@ -462,12 +614,52 @@ var Application = (function() {
             return merge(...html2compress);
         }
 
-        p_compressAppJs () {
-            return gulp.src(this.appJsFilesGlobsArray())
+        p_compressCoreJs () {
+            return gulp.src(this.coreJsFilesGlobsArray())
                 .pipe(babel())
-                .pipe(concat('app.min.js'))
+                .pipe(concat('core.min.js'))
                 .pipe(this.canUglify ? uglify() : nop())
                 .pipe(gulp.dest(this.paths.dist.app));
+        }
+
+        p_compressComJs () {
+            return gulp.src(this.comJsFilesGlobsArray())
+                .pipe(babel())
+                .pipe(concat('com.min.js'))
+                .pipe(this.canUglify ? uglify() : nop())
+                .pipe(gulp.dest(this.paths.dist.app));
+        }
+
+        p_compressBrxJs () {
+            return gulp.src(this.brxJsFilesGlobsArray())
+                .pipe(babel())
+                .pipe(concat('brx.min.js'))
+                .pipe(this.canUglify ? uglify() : nop())
+                .pipe(gulp.dest(this.paths.dist.app));
+        }
+
+        p_compressApiJs () {
+            return gulp.src(this.apiJsFilesGlobsArray())
+                .pipe(babel())
+                .pipe(concat('api.min.js'))
+                .pipe(this.canUglify ? uglify() : nop())
+                .pipe(gulp.dest(this.paths.dist.app));
+        }
+
+        p_compressPgsJs () {
+            return gulp.src(this.pgsJsFilesGlobsArray())
+                .pipe(babel())
+                .pipe(concat('pgs.min.js'))
+                .pipe(this.canUglify ? uglify() : nop())
+                .pipe(gulp.dest(this.paths.dist.app));
+        }
+
+        p_compressLibJs () {
+            return gulp.src(this.libJsFilesGlobsArray())
+                .pipe(babel())
+                .pipe(concat('lib.min.js'))
+                .pipe(this.canUglify ? uglify() : nop())
+                .pipe(gulp.dest(this.paths.run.app));
         }
 
         p_compressVendorsJs () {
@@ -483,20 +675,12 @@ var Application = (function() {
                 .pipe(gulp.dest(this.paths.run.app));
         }
 
-        p_compressLibJs () {
-            return gulp.src(this.combinePath(this.paths.run.libs, '**/*.js'))
-                .pipe(babel())
-                .pipe(concat('libs.min.js'))
-                .pipe(this.canUglify ? uglify() : nop())
-                .pipe(gulp.dest(this.paths.run.app));
-        }
-
         p_compressHtml () {
             if (!this.isDeloyment) {
                 return false;
             }
             return gulp.src(this.appHtmlFilesGlobsArray(),
-                    {base: this.combinePathDir('.', this.appName)})
+                    {base: this.combinePathDir('.', this.name)})
 
                 .pipe(preprocess({
                     context: this.injectables
@@ -506,7 +690,7 @@ var Application = (function() {
         }
 
         p_lintJs () {
-            return gulp.src(this.appJsFilesGlobsArray('src'))
+            return gulp.src(this.coreJsFilesGlobsArray('src'))
                 .pipe(eslint())
                 .pipe(eslint.format())
                 .pipe(eslint.results(function (results) {
@@ -519,9 +703,20 @@ var Application = (function() {
         }
 
         p_watch () {
-            gulp.watch(this.appJsFilesGlobsArray(), this.p_lintJs.bind(this));
+            gulp.watch(this.coreJsFilesGlobsArray(), this.p_lintJs.bind(this));
             gulp.watch(this.combinePath(this.paths.run.assetsStyles, '**'), gulp.series(...this.t_genCss.bind(this)()));
             gulp.watch(this.combinePath(this.paths.run.app, '*.tpl.html'), this.p_transformTemplate.bind(this));
+        }
+
+        p_test () {
+            var that = this;
+            return gulp.src(this.testE2ESpecsJsFilesGlobsArray())
+                .pipe(protractor({
+                    configFile: that.combinePath(that.paths.run.tests, 'protractor.js'),
+                    args: [
+                        '--baseUrl', 'http://127.0.0.1:8000'
+                    ]
+                }));
         }
 
     }
@@ -532,23 +727,31 @@ var Application = (function() {
 function doForEachApp(cb) {
     var series = [];
     apps.forEach((appName) => {
-        var tasks = cb(appName);
-        series.push(...tasks);
-    });
-    return gulp.series(...series);
-}
-
-function taskBuild () {
-    return doForEachApp((appName) => {
+        // var tasks = cb(appName);
         var app = new Application({
             name: appName,
             baseCfg: baseConfig,
             ver: buildVersion,
             env: env
         });
-        return app.t_build();
+        var tasks = app[cb]();
+        series.push(...tasks);
     });
+    return gulp.series(...series);
 }
 
-gulp.task('default', taskBuild());
-gulp.task('build', taskBuild());
+// function taskB () {
+//     return doForEachApp((appName) => {
+//         var app = new Application({
+//             name: appName,
+//             baseCfg: baseConfig,
+//             ver: buildVersion,
+//             env: env
+//         });
+//         return app.t_build();
+//     });
+// }
+
+gulp.task('default', doForEachApp('t_build'));
+gulp.task('build', doForEachApp('t_build'));
+gulp.task('test', doForEachApp('t_test'));

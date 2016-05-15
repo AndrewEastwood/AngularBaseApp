@@ -4,7 +4,7 @@
     /************************************/
     /*             NG Setup             */
     /************************************/
-    angular.module('com.todoList', ['brx.button'])
+    angular.module('com')
         .directive('todoList', todoList);
 
 
@@ -15,11 +15,11 @@
     function todoList (globalGetStaticRootToApp) {
         return {
             restrict: 'E',
-            templateUrl: globalGetStaticRootToApp('com/todoList/todoList.html'),
+            templateUrl: globalGetStaticRootToApp('components/todoList/todoList.html'),
             scope: {
-                title: '='
+                heading: '@'
             },
-            replace: true,
+            // replace: true,
             controller: controller
         };
     }
@@ -31,6 +31,8 @@
         $scope.newItem = null;
 
         function add () {
+            if (!!!$scope.newItem) return false;
+            debugger;
             $scope.items.push({
                 done: false,
                 name: $scope.newItem

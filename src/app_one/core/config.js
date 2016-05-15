@@ -11,9 +11,9 @@
     /*           IMPLEMENTATION         */
     /************************************/
 
-    config.$inject = [];
-    function config () {
-
+    config.$inject = ['$urlRouterProvider'];
+    function config ($urlRouterProvider) {
+        $urlRouterProvider.otherwise('/');
     }
 
 })();

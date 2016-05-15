@@ -1,1 +1,1 @@
-button{font-size:1em;border:1px solid #93c;color:#333;padding:5px 3px;margin:0;line-height:normal}body{color:#333;background:url(/img/test.png);font-size:16px}.a{width:10px}
+@import url(/vendors/angular-material/angular-material.min.css);@import url(/vendors/bootstrap/dist/css/bootstrap.min.css);button{font-size:1em;border:1px solid #93c;color:#333;padding:5px 3px;margin:0;line-height:normal}body{color:#333;background:url(/assets/img/test.png);font-size:16px}.a{width:10px}

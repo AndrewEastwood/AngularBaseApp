@@ -19,7 +19,7 @@
         <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
     <script type="text/javascript">
-    var CONFIG = {"solution":"Your test solution","cookieHost":"localhost","hostname":"http://localhost/","apiUrl":"","gaKey":"","mainHtmlFiles":["index"],"bustFiles":false,"staticUrlPrefix":"/","bundles":[{"putInto":"static","globs":["api","assets","components","libs","pages"]}]};
+    var CONFIG = {"solution":"Your test solution","cookieHost":"localhost","hostname":"http://localhost/","apiUrl":"","gaKey":"","mainHtmlFiles":["index"],"bustFiles":false,"staticUrlPrefix":"/","bundles":[{"putInto":"static","globs":["api","assets","components","libs","pages"]}],"urls":{"static":"/"}};
     </script>
 </head>
 <body>
@@ -36,14 +36,31 @@
     <script crossorigin="anonymous" src="/vendors/angular-resource/angular-resource.js"></script>
     <script crossorigin="anonymous" src="/vendors/bootstrap/dist/js/bootstrap.js"></script>
     <script crossorigin="anonymous" src="/vendors/ui-router/release/angular-ui-router.js"></script>
+    <script crossorigin="anonymous" src="/vendors/angular-cookie/angular-cookie.js"></script>
+    <script crossorigin="anonymous" src="/vendors/angular-animate/angular-animate.js"></script>
+    <script crossorigin="anonymous" src="/vendors/angular-messages/angular-messages.js"></script>
     <script crossorigin="anonymous" src="/vendors/angular-touch/angular-touch.js"></script>
+    <script crossorigin="anonymous" src="/vendors/angular-material/angular-material.js"></script>
     <!-- endinject -->
-    <!-- app:js -->
-    <script crossorigin="anonymous" src="/app.js"></script>
-    <script crossorigin="anonymous" src="/api/0.1/api.js"></script>
+    <!-- core:js -->
+    <script crossorigin="anonymous" src="/core/app.js"></script>
+    <script crossorigin="anonymous" src="/core/config.js"></script>
+    <script crossorigin="anonymous" src="/core/filters.js"></script>
+    <script crossorigin="anonymous" src="/core/interceptors.js"></script>
+    <script crossorigin="anonymous" src="/core/resolvers.js"></script>
+    <script crossorigin="anonymous" src="/core/settings.js"></script>
+    <!-- endinject -->
+    <!-- brx:js -->
     <script crossorigin="anonymous" src="/bricks/button/button.js"></script>
+    <!-- endinject -->
+    <!-- com:js -->
     <script crossorigin="anonymous" src="/components/todoList/todoList.js"></script>
+    <!-- endinject -->
+    <!-- pgs:js -->
     <script crossorigin="anonymous" src="/pages/home/home.js"></script>
+    <!-- endinject -->
+    <!-- api:js -->
+    <script crossorigin="anonymous" src="/api/0.1/api.js"></script>
     <!-- endinject -->
     <!-- libs:js -->
     <script crossorigin="anonymous" src="/libs/lib.js"></script>

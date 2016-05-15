@@ -11,9 +11,9 @@
                 if (path[0] === '/') {
                     path = path.substr(1);
                 }
-                return window.CONFIG.STATICDIR + path;
+                return window.CONFIG.urls.static + path;
             }
-            return window.CONFIG.STATICDIR;
+            return window.CONFIG.urls.static;
         })
         .constant('globalGetStaticRootToApp', function (path) {
             if (!window.CONFIG) {
@@ -23,9 +23,9 @@
                 if (path[0] === '/') {
                     path = path.substr(1);
                 }
-                return window.CONFIG.SOLUTIONDIR + window.CONFIG.APP + '/' + path;
+                return window.CONFIG.urls.static + path;
             }
-            return window.CONFIG.SOLUTIONDIR;
+            return window.CONFIG.urls.static;
         })
         .constant('globalGetApiRoot', function (path) {
             if (!window.CONFIG) {
