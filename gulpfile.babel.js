@@ -25,7 +25,7 @@ import bower from 'gulp-bower';
 import debug from 'gulp-debug';
 import logger from 'gulp-logger';
 import {protractor} from 'gulp-protractor';
-import {karmaServer} from 'karma';
+import karma from 'gulp-karma-runner';
 
 var
     // application's main config file
@@ -78,7 +78,7 @@ var Application = (function() {
     var getDirNameFromPath = (path) => path.match(/([^\/]*)\/*$/)[1];
 
     class _Application {
-        constructor ({name: appName, baseCfg: baseConfig, ver: ver, env: env}) {
+        constructor ({name: appName, baseCfg: baseConfig, ver: ver, env: env, done: done}) {
             
             privates.set(this, {
                 name: appName,
@@ -86,7 +86,8 @@ var Application = (function() {
                 env: env,
                 cfg: null,
                 paths: null,
-                urls: null
+                urls: null,
+                doneCb: done
             });
 
             this.applogger('initializing');
@@ -106,8 +107,10 @@ var Application = (function() {
                     core: this.getPathToFileInAppDir(this.dirNames.core),
                     tests: this.getPathToFileInAppDir(this.dirNames.tests),
                     specs: this.combinePathDir(this.getPathToFileInAppDir(this.dirNames.tests), this.dirNames.specs),
-                    specsE2E: this.combinePathDir(this.getPathToFileInAppDir(this.dirNames.tests), this.dirNames.specs, this.dirNames.e2e),
-                    specsUnit: this.combinePathDir(this.getPathToFileInAppDir(this.dirNames.tests), this.dirNames.specs, this.dirNames.unit),
+                    specsE2E: this.combinePathDir(this.getPathToFileInAppDir(this.dirNames.tests), this.dirNames.e2e),
+                    specsUnit: this.combinePathDir(this.getPathToFileInAppDir(this.dirNames.tests), this.dirNames.unit),
+                    mocks: this.combinePathDir(this.getPathToFileInAppDir(this.dirNames.tests), this.dirNames.mocks),
+                    rawmocks: this.combinePathDir(this.getPathToFileInAppDir(this.dirNames.tests), this.dirNames.rawmocks),
                     bowerJson: this.getPathToFileInAppDir('bower.json'),
                     api: this.combinePathDir(this.getPathToFileInAppDir, this.dirNames.api),
                     bricks: this.combinePathDir(this.getPathToFileInAppDir, this.dirNames.bricks),
@@ -125,8 +128,10 @@ var Application = (function() {
                     core: this.getPathToFileInDistAppDir(this.dirNames.core),
                     tests: this.getPathToFileInDistAppDir(this.dirNames.tests),
                     specs: this.combinePathDir(this.getPathToFileInDistAppDir(this.dirNames.tests), this.dirNames.specs),
-                    specsE2E: this.combinePathDir(this.getPathToFileInDistAppDir(this.dirNames.tests), this.dirNames.specs, this.dirNames.e2e),
-                    specsUnit: this.combinePathDir(this.getPathToFileInDistAppDir(this.dirNames.tests), this.dirNames.specs, this.dirNames.unit),
+                    specsE2E: this.combinePathDir(this.getPathToFileInDistAppDir(this.dirNames.tests), this.dirNames.e2e),
+                    specsUnit: this.combinePathDir(this.getPathToFileInDistAppDir(this.dirNames.tests), this.dirNames.unit),
+                    mocks: this.combinePathDir(this.getPathToFileInDistAppDir(this.dirNames.tests), this.dirNames.mocks),
+                    rawmocks: this.combinePathDir(this.getPathToFileInDistAppDir(this.dirNames.tests), this.dirNames.rawmocks),
                     bowerJson: this.getPathToFileInDistAppDir('bower.json'),
                     api: this.combinePathDir(this.getPathToFileInDistAppDir, this.dirNames.api),
                     bricks: this.combinePathDir(this.getPathToFileInDistAppDir, this.dirNames.bricks),
@@ -172,11 +177,14 @@ var Application = (function() {
         get config () { return privates.get(this).cfg; }
         get paths () { return privates.get(this).paths; }
         get urls () { return privates.get(this).urls; }
+        get doneCb () { return privates.get(this).doneCb; }
         get staticUrl () { return this.urls.static; }
         get mainHtmlFiles () { return this.config.mainHtmlFiles; }
         get dirNames () {
             var dirNames = {
                 specs: 'specs',
+                mocks: 'mocks',
+                rawmocks: 'rawmocks',
                 e2e: 'e2e',
                 unit: 'unit',
                 tests: 'tests',
@@ -219,7 +227,34 @@ var Application = (function() {
         testUnitSpecsJsFilesGlobsArray (k = 'run') {
             var wrkPh = this.paths[k.toLowerCase().trim()],
                 jsAppFiles = [
-                    this.combinePath(wrkPh.specsUnit, '*spec.js')
+                    ...bowerFiles({
+                        filter: /.*\.js$/,
+                        paths: {
+                            bowerJson: wrkPh.bowerJson,
+                            bowerDirectory: wrkPh.vendors
+                        }
+                    }),
+                    ...this.coreJsFilesGlobsArray(),
+                    ...this.brxJsFilesGlobsArray(),
+                    ...this.comJsFilesGlobsArray(),
+                    ...this.apiJsFilesGlobsArray(),
+                    ...this.pgsJsFilesGlobsArray(),
+                    ...this.libJsFilesGlobsArray(),
+                    this.combinePath(wrkPh.specsUnit, '*.js')
+                ];
+            return jsAppFiles;
+        }
+        testMocksJsFilesGlobsArray (k = 'run') {
+            var wrkPh = this.paths[k.toLowerCase().trim()],
+                jsAppFiles = [
+                    this.combinePath(wrkPh.mocks, '*.js')
+                ];
+            return jsAppFiles;
+        }
+        testRawMocksJsFilesGlobsArray (k = 'run') {
+            var wrkPh = this.paths[k.toLowerCase().trim()],
+                jsAppFiles = [
+                    this.combinePath(wrkPh.rawmocks, '*.js')
                 ];
             return jsAppFiles;
         }
@@ -312,8 +347,10 @@ var Application = (function() {
         //-------- TASKS
 
         t_test () {
-            var tasks = [];
-            tasks.push(this.p_test.bind(this));
+            var tasks = [
+                this.p_test_e2e.bind(this),
+                ...this.t_test_unit.bind(this)()
+            ];
             return tasks;
         }
 
@@ -449,6 +486,56 @@ var Application = (function() {
             };
 
             return [move2static, cleanInDist];
+        }
+
+        t_test_unit () {
+            var mocks = () => {
+                return gulp.src(this.testRawMocksJsFilesGlobsArray())
+                    .pipe(preprocess({
+                        context: this.injectables
+                    }))
+                    .pipe(gulp.dest(this.paths.run.mocks));
+            };
+
+            var unit = () => {
+                var files = [
+                    ...this.testMocksJsFilesGlobsArray(),
+                    ...this.testUnitSpecsJsFilesGlobsArray()
+                ];
+                // console.log(files);
+                return gulp.src(files)
+                    .pipe(
+                        karma.server({
+                            singleRun: true,
+                            frameworks: ['jasmine'],
+                            browsers: ['Chrome'],
+                            // plugins: [
+                            //     'karma-jasmine'
+                            // ],
+
+                            // test result reporter
+                            reporters: ['progress'],
+
+                            // web server port
+                            // port: 9876,
+
+                            // enable / disable colors in the output (reporters and logs)
+                            colors: true,
+
+                            // enable / disable watching file and executing tests whenever any file changes
+                            // autoWatch: true,
+
+                            // Continuous Integration mode
+                            // singleRun: false
+                        })
+                    );
+            }
+
+            var cleanMocks = () => {
+                return gulp.src(this.paths.run.mocks, {allowEmpty: true, read: false})
+                   .pipe(clean());
+            }
+            return [cleanMocks, mocks, unit];
         }
         //--------- FILE MODIFIERS
 
@@ -708,13 +795,13 @@ var Application = (function() {
             gulp.watch(this.combinePath(this.paths.run.app, '*.tpl.html'), this.p_transformTemplate.bind(this));
         }
 
-        p_test () {
+        p_test_e2e () {
             var that = this;
             return gulp.src(this.testE2ESpecsJsFilesGlobsArray())
                 .pipe(protractor({
                     configFile: that.combinePath(that.paths.run.tests, 'protractor.js'),
                     args: [
-                        '--baseUrl', 'http://127.0.0.1:8000'
+                        '--basekrl', 'http://127.0.0.1:8000'
                     ]
                 }));
         }
@@ -725,33 +812,25 @@ var Application = (function() {
 })();
 
 function doForEachApp(cb) {
-    var series = [];
-    apps.forEach((appName) => {
-        // var tasks = cb(appName);
-        var app = new Application({
-            name: appName,
-            baseCfg: baseConfig,
-            ver: buildVersion,
-            env: env
-        });
-        var tasks = app[cb]();
-        series.push(...tasks);
-    });
-    return gulp.series(...series);
+    return {
+        run (done) {
+            var series = [];
+            apps.forEach((appName) => {
+                // var tasks = cb(appName);
+                var app = new Application({
+                    name: appName,
+                    baseCfg: baseConfig,
+                    ver: buildVersion,
+                    env: env
+                });
+                var tasks = app[cb]();
+                series.push(...tasks);
+            });
+            return gulp.series(...series);
+        }
+    }
 }
 
-// function taskB () {
-//     return doForEachApp((appName) => {
-//         var app = new Application({
-//             name: appName,
-//             baseCfg: baseConfig,
-//             ver: buildVersion,
-//             env: env
-//         });
-//         return app.t_build();
-//     });
-// }
-
-gulp.task('default', doForEachApp('t_build'));
-gulp.task('build', doForEachApp('t_build'));
-gulp.task('test', doForEachApp('t_test'));
+gulp.task('default', doForEachApp('t_build').run());
+gulp.task('build', doForEachApp('t_build').run());
+gulp.task('test', doForEachApp('t_test').run());

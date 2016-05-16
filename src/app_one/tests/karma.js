@@ -2,21 +2,25 @@ module.exports = function(config) {
   config.set({
 
     // base path that will be used to resolve all patterns
-    basePath: '.',
+    // basePath: '.',
 
     // frameworks to use
-    frameworks: ['mocha', 'chai'],
+    frameworks: ['jasmine'],
 
     // list of files / patterns to load in the browser
-    files: [
-      '../app/bower_components/angular/angular.js',
-      '../app/bower_components/jquery/dist/jquery.js',
-      '../app/bower_components/angular-strap/dist/angular-strap.js',
-      '../app/bower_components/angular-strap/dist/angular-strap.tpl.js',
-      '../app/bower_components/angular-mocks/angular-mocks.js',
-      '../app/bower_components/angular-route/angular-route.js',
-      './unit/*.js',
-      '../app/app.js'
+    // files: [
+    //   '../app/bower_components/angular/angular.js',
+    //   '../app/bower_components/jquery/dist/jquery.js',
+    //   '../app/bower_components/angular-strap/dist/angular-strap.js',
+    //   '../app/bower_components/angular-strap/dist/angular-strap.tpl.js',
+    //   '../app/bower_components/angular-mocks/angular-mocks.js',
+    //   '../app/bower_components/angular-route/angular-route.js',
+    //   './unit/*.js',
+    //   '../app/app.js'
+    // ],
+
+    plugins: [
+        'karma-jasmine'
     ],
 
     // test result reporter

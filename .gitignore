@@ -9,3 +9,4 @@ npm-debug.log
 *.orig
 /ui/src/*.html
 !/ui/src/*.tpl.html
+mocks/

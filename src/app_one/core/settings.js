@@ -1,5 +1,7 @@
 (function () {
 
+    var wndCfg = window.CONFIG || {};
+
     'use strict';
     angular.module('settings', [])
         .constant('globalIsDebugMode', window.CONFIG.DEBUG)

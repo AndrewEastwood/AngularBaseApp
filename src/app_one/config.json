@@ -1,10 +1,6 @@
 {
     "common": {
         "staticUrlPrefix": "/",
-        "bundles": [{
-            "putInto": "static",
-            "globs": ["api", "assets", "components", "libs", "pages"]
-        }],
         "bustFiles": false
     },
     "debug": {
