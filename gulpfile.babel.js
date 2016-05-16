@@ -234,12 +234,12 @@ var Application = (function() {
                             bowerDirectory: wrkPh.vendors
                         }
                     }),
-                    ...this.coreJsFilesGlobsArray(),
-                    ...this.brxJsFilesGlobsArray(),
-                    ...this.comJsFilesGlobsArray(),
-                    ...this.apiJsFilesGlobsArray(),
-                    ...this.pgsJsFilesGlobsArray(),
-                    ...this.libJsFilesGlobsArray(),
+                    ...this.coreJsFilesGlobsArray(k),
+                    ...this.brxJsFilesGlobsArray(k),
+                    ...this.comJsFilesGlobsArray(k),
+                    ...this.apiJsFilesGlobsArray(k),
+                    ...this.pgsJsFilesGlobsArray(k),
+                    ...this.libJsFilesGlobsArray(k),
                     this.combinePath(wrkPh.specsUnit, '*.js')
                 ];
             return jsAppFiles;
@@ -349,7 +349,7 @@ var Application = (function() {
         t_test () {
             var tasks = [
                 this.p_test_e2e.bind(this),
-                ...this.t_test_unit.bind(this)()
+                gulp.series(...this.t_test_unit.bind(this)())
             ];
             return tasks;
         }
@@ -378,6 +378,7 @@ var Application = (function() {
         t_buildDist () {
             return [
                 this.p_lintJs.bind(this),
+                ...this.t_test.bind(this)(),
                 this.p_InstallBowerDeps.bind(this),
                 this.p_clearDist.bind(this),
                 this.p_copyFiles.bind(this),
@@ -490,17 +491,17 @@ var Application = (function() {
 
         t_test_unit () {
             var mocks = () => {
-                return gulp.src(this.testRawMocksJsFilesGlobsArray())
+                return gulp.src(this.testRawMocksJsFilesGlobsArray('src'))
                     .pipe(preprocess({
                         context: this.injectables
                     }))
-                    .pipe(gulp.dest(this.paths.run.mocks));
+                    .pipe(gulp.dest(this.paths.src.mocks));
             };
 
             var unit = () => {
                 var files = [
-                    ...this.testMocksJsFilesGlobsArray(),
-                    ...this.testUnitSpecsJsFilesGlobsArray()
+                    ...this.testMocksJsFilesGlobsArray('src'),
+                    ...this.testUnitSpecsJsFilesGlobsArray('src')
                 ];
                 // console.log(files);
                 return gulp.src(files)
@@ -532,7 +533,7 @@ var Application = (function() {
             }
 
             var cleanMocks = () => {
-                return gulp.src(this.paths.run.mocks, {allowEmpty: true, read: false})
+                return gulp.src(this.paths.src.mocks, {allowEmpty: true, read: false})
                    .pipe(clean());
             }
             return [cleanMocks, mocks, unit];
@@ -797,9 +798,9 @@ var Application = (function() {
 
         p_test_e2e () {
             var that = this;
-            return gulp.src(this.testE2ESpecsJsFilesGlobsArray())
+            return gulp.src(this.testE2ESpecsJsFilesGlobsArray('src'))
                 .pipe(protractor({
-                    configFile: that.combinePath(that.paths.run.tests, 'protractor.js'),
+                    configFile: that.combinePath(that.paths.src.tests, 'protractor.js'),
                     args: [
                         '--basekrl', 'http://127.0.0.1:8000'
                     ]
