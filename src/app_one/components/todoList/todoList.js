@@ -5,6 +5,7 @@
     /*             NG Setup             */
     /************************************/
     angular.module('com')
+        .controller('todoListController', controller)
         .directive('todoList', todoList);
 
 
@@ -19,20 +20,23 @@
             scope: {
                 heading: '@'
             },
-            // replace: true,
-            controller: controller
+            controller: 'todoListController'
         };
     }
 
     controller.$inject = ['$scope']
     function controller ($scope) {
+        $scope.total = total;
         $scope.add = add;
         $scope.items = [];
         $scope.newItem = null;
 
+        function total () {
+            return $scope.items.length;
+        }
+
         function add () {
             if (!!!$scope.newItem) return false;
-            debugger;
             $scope.items.push({
                 done: false,
                 name: $scope.newItem

@@ -10,3 +10,4 @@ npm-debug.log
 /ui/src/*.html
 !/ui/src/*.tpl.html
 mocks/
+coverage/

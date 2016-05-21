@@ -26,6 +26,7 @@ import debug from 'gulp-debug';
 import logger from 'gulp-logger';
 import {protractor} from 'gulp-protractor';
 import karma from 'gulp-karma-runner';
+import istanbul from 'gulp-istanbul';
 
 var
     // application's main config file
@@ -314,6 +315,16 @@ var Application = (function() {
                 ];
             return jsAppFiles;
         }
+        appJsAllFilesGlobsArray (k = 'run') {
+            return [
+                ...this.coreJsFilesGlobsArray(k),
+                ...this.comJsFilesGlobsArray(k),
+                ...this.brxJsFilesGlobsArray(k),
+                ...this.apiJsFilesGlobsArray(k),
+                ...this.pgsJsFilesGlobsArray(k),
+                ...this.libJsFilesGlobsArray(k)
+            ];
+        }
 
         combinePath (...p) {
             return combinePath.bind(this)(...p);
@@ -348,7 +359,7 @@ var Application = (function() {
 
         t_test () {
             var tasks = [
-                this.p_test_e2e.bind(this),
+                // this.p_test_e2e.bind(this),
                 gulp.series(...this.t_test_unit.bind(this)())
             ];
             return tasks;
@@ -490,6 +501,12 @@ var Application = (function() {
         }
 
         t_test_unit () {
+            var files = [
+                ...this.testMocksJsFilesGlobsArray('src'),
+                ...this.testUnitSpecsJsFilesGlobsArray('src')
+            ];
+
+
             var mocks = () => {
                 return gulp.src(this.testRawMocksJsFilesGlobsArray('src'))
                     .pipe(preprocess({
@@ -498,11 +515,13 @@ var Application = (function() {
                     .pipe(gulp.dest(this.paths.src.mocks));
             };
 
+            var preTest = () => {
+                return gulp.src(this.testUnitSpecsJsFilesGlobsArray('src'))
+                    .pipe(istanbul())
+                    .pipe(istanbul.hookRequire());
+            };
+
             var unit = () => {
-                var files = [
-                    ...this.testMocksJsFilesGlobsArray('src'),
-                    ...this.testUnitSpecsJsFilesGlobsArray('src')
-                ];
                 // console.log(files);
                 return gulp.src(files)
                     .pipe(
@@ -510,26 +529,38 @@ var Application = (function() {
                             singleRun: true,
                             frameworks: ['jasmine'],
                             browsers: ['Chrome'],
-                            // plugins: [
-                            //     'karma-jasmine'
-                            // ],
+                            plugins: [
+                                'karma-chrome-launcher',
+                                'karma-jasmine',
+                                'karma-mocha-reporter'
+                            ],
 
                             // test result reporter
-                            reporters: ['progress'],
-
+                            reporters: ['mocha'],
+                            // junitReporter : {
+                            //     outputFile: this.combinePath(this.paths.src.tests, 'out', 'unit.xml'),
+                            //     suite: 'unit'
+                            // },
                             // web server port
                             // port: 9876,
-
+                            // preprocessors: {
+                            //   '**/api/*.js': 'coverage'
+                            // },
                             // enable / disable colors in the output (reporters and logs)
                             colors: true,
 
                             // enable / disable watching file and executing tests whenever any file changes
                             // autoWatch: true,
-
+                            // coverageReporter: {
+                            //     type: 'html',
+                            //     dir: this.combinePathDir(this.paths.src.app, 'coverage')
+                            // }
                             // Continuous Integration mode
                             // singleRun: false
                         })
-                    );
+                    )
+                    .pipe(istanbul.writeReports())
+                    .pipe(istanbul.enforceThresholds({ thresholds: { global: 90 } }));
             }
 
             var cleanMocks = () => {
@@ -817,7 +848,6 @@ function doForEachApp(cb) {
         run (done) {
             var series = [];
             apps.forEach((appName) => {
-                // var tasks = cb(appName);
                 var app = new Application({
                     name: appName,
                     baseCfg: baseConfig,
