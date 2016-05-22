@@ -203,6 +203,16 @@ var Application = (function() {
             };
             return dirNames;
         }
+        get dirSrcAppJsNames () {
+            var dirNames = {
+                core: 'core',
+                api: 'api',
+                bricks: 'bricks',
+                components: 'components',
+                pages: 'pages'
+            };
+            return dirNames;
+        }
         get injectables () {
             var config = this.config;
             config.urls = this.urls;
@@ -228,19 +238,6 @@ var Application = (function() {
         testUnitSpecsJsFilesGlobsArray (k = 'run') {
             var wrkPh = this.paths[k.toLowerCase().trim()],
                 jsAppFiles = [
-                    ...bowerFiles({
-                        filter: /.*\.js$/,
-                        paths: {
-                            bowerJson: wrkPh.bowerJson,
-                            bowerDirectory: wrkPh.vendors
-                        }
-                    }),
-                    ...this.coreJsFilesGlobsArray(k),
-                    ...this.brxJsFilesGlobsArray(k),
-                    ...this.comJsFilesGlobsArray(k),
-                    ...this.apiJsFilesGlobsArray(k),
-                    ...this.pgsJsFilesGlobsArray(k),
-                    ...this.libJsFilesGlobsArray(k),
                     this.combinePath(wrkPh.specsUnit, '*.js')
                 ];
             return jsAppFiles;
@@ -324,6 +321,19 @@ var Application = (function() {
                 ...this.pgsJsFilesGlobsArray(k),
                 ...this.libJsFilesGlobsArray(k)
             ];
+        }
+        vendorsJsFilesGlobsArray (k = 'run') {
+            var wrkPh = this.paths[k.toLowerCase().trim()],
+                jsAppFiles = [
+                    ...bowerFiles({
+                        filter: /.*\.js$/,
+                        paths: {
+                            bowerJson: wrkPh.bowerJson,
+                            bowerDirectory: wrkPh.vendors
+                        }
+                    })
+                ];
+            return jsAppFiles;
         }
 
         combinePath (...p) {
@@ -503,9 +513,10 @@ var Application = (function() {
         t_test_unit () {
             var files = [
                 ...this.testMocksJsFilesGlobsArray('src'),
-                ...this.testUnitSpecsJsFilesGlobsArray('src')
+                ...this.vendorsJsFilesGlobsArray('src'),
+                ...this.testUnitSpecsJsFilesGlobsArray('src'),
+                ...this.appJsAllFilesGlobsArray('src')
             ];
-
 
             var mocks = () => {
                 return gulp.src(this.testRawMocksJsFilesGlobsArray('src'))
@@ -516,51 +527,56 @@ var Application = (function() {
             };
 
             var preTest = () => {
-                return gulp.src(this.testUnitSpecsJsFilesGlobsArray('src'))
+                return gulp.src(this.appJsAllFilesGlobsArray('src'))
+                    .pipe(debug())
                     .pipe(istanbul())
                     .pipe(istanbul.hookRequire());
             };
 
             var unit = () => {
+                var filesToPreprocess = {};
+
+                Object.keys(this.dirSrcAppJsNames).forEach((srcDirName) => {
+                    filesToPreprocess[`**/${srcDirName}/**/*.js`] = ['coverage'];
+                });
+
                 // console.log(files);
                 return gulp.src(files)
-                    .pipe(
-                        karma.server({
-                            singleRun: true,
-                            frameworks: ['jasmine'],
-                            browsers: ['Chrome'],
-                            plugins: [
-                                'karma-chrome-launcher',
-                                'karma-jasmine',
-                                'karma-mocha-reporter'
-                            ],
+                    .pipe(karma.server({
+                        singleRun: true,
+                        frameworks: ['jasmine'],
+                        browsers: ['Chrome'],
+                        plugins: [
+                            'karma-chrome-launcher',
+                            'karma-jasmine',
+                            'karma-mocha-reporter',
+                            'karma-coverage'
+                        ],
 
-                            // test result reporter
-                            reporters: ['mocha'],
-                            // junitReporter : {
-                            //     outputFile: this.combinePath(this.paths.src.tests, 'out', 'unit.xml'),
-                            //     suite: 'unit'
-                            // },
-                            // web server port
-                            // port: 9876,
-                            // preprocessors: {
-                            //   '**/api/*.js': 'coverage'
-                            // },
-                            // enable / disable colors in the output (reporters and logs)
-                            colors: true,
-
-                            // enable / disable watching file and executing tests whenever any file changes
-                            // autoWatch: true,
-                            // coverageReporter: {
-                            //     type: 'html',
-                            //     dir: this.combinePathDir(this.paths.src.app, 'coverage')
-                            // }
-                            // Continuous Integration mode
-                            // singleRun: false
-                        })
-                    )
-                    .pipe(istanbul.writeReports())
-                    .pipe(istanbul.enforceThresholds({ thresholds: { global: 90 } }));
+                        // test result reporter
+                        reporters: ['progress', 'coverage'],
+                        preprocessors: filesToPreprocess,
+                        // junitReporter : {
+                        //     outputFile: this.combinePath(this.paths.src.tests, 'out', 'unit.xml'),
+                        //     suite: 'unit'
+                        // },
+                        // web server port
+                        // port: 9876,
+                        // enable / disable colors in the output (reporters and logs)
+                        colors: true,
+                        // enable / disable watching file and executing tests whenever any file changes
+                        // autoWatch: true,
+                        coverageReporter: {
+                            type: 'text',
+                            dir: null,//this.combinePathDir(this.paths.src.tests, 'coverage'),
+                            file: null
+                        },
+                        // logLevel: 'DEBUG'
+                        // Continuous Integration mode
+                        // singleRun: false
+                    }))
+                    // .pipe(istanbul.writeReports())
+                    // .pipe(istanbul.enforceThresholds({ thresholds: { global: 90 } }));
             }
 
             var cleanMocks = () => {
