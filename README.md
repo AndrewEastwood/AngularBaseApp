@@ -1,4 +1,4 @@
-# AngularBaseApp
+# AngularBaseApp [![Build Status](https://travis-ci.org/AndrewEastwood/AngularBaseApp.svg?branch=master)](https://travis-ci.org/AndrewEastwood/AngularBaseApp)
 This structure helps to keep all your SPAs in one solution and  
 build each application into a separate distro.  
 Using that you can deploy your built apps into different  
